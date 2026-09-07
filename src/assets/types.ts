@@ -15,6 +15,17 @@ export interface SpritesheetValidation {
   json: unknown;
 }
 
+export interface SpritesheetPair {
+  image: File;
+  json: unknown;
+}
+
+export interface MultiSpritesheetValidation {
+  valid: true;
+  type: 'spritesheet';
+  sheets: SpritesheetPair[];
+}
+
 export interface SequenceValidation {
   valid: true;
   type: 'sequence';
@@ -27,7 +38,7 @@ export interface InvalidValidation {
 }
 
 export type SpriteFileValidation = PlainSpriteValidation | SpritesheetValidation | InvalidValidation;
-export type AnimationValidation = SpritesheetValidation | SequenceValidation | InvalidValidation;
+export type AnimationValidation = MultiSpritesheetValidation | SequenceValidation | InvalidValidation;
 
 export interface FrameOption {
   name: string;

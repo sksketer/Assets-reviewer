@@ -1,7 +1,7 @@
 import { AnimatedSprite, Sprite, Spritesheet, Texture } from 'pixi.js';
 import { loadImageFile } from './loadImage';
 import { naturalCompare } from './naturalSort';
-import type { AssetInfo, FrameOption } from './types';
+import type { AssetInfo, FrameOption, SpritesheetPair } from './types';
 
 export interface CreatedSprite {
   display: Sprite;
@@ -87,34 +87,84 @@ export async function createSpriteFromSheet(image: File, jsonData: unknown): Pro
   return { display: sprite, info };
 }
 
-export async function createAnimatedSpriteFromSheet(image: File, jsonData: unknown): Promise<CreatedAnimatedSprite> {
-  const animationTags = extractAnimationTags(jsonData);
-  const { texture, sheet } = await buildSpritesheet(image, jsonData);
-  const frames = atlasFrames(sheet);
-  const textureByName = new Map(frames.map((f) => [f.name, f.texture]));
+export interface LoadedSpritesheets {
+  label: string;
+  fileSizeBytes: number;
+  dimensionsLabel: string;
+  gpuMemoryBytes: number;
+  /** All frames across every loaded sheet, namespaced as "<pngBaseName>/<frameName>" when more than one sheet is loaded. */
+  frames: FrameOption[];
+  /** Frame names to pre-check in the animation config dialog — the first sheet's tagged animation if present, else every frame. */
+  defaultSelectedNames: string[];
+}
 
-  const firstTag = Object.keys(animationTags)[0];
-  const taggedNames = firstTag ? animationTags[firstTag] : [];
-  const playbackFrameNames = taggedNames.length > 0 ? taggedNames : frames.map((f) => f.name);
-  const playbackTextures = playbackFrameNames
-    .map((name) => textureByName.get(name))
-    .filter((t): t is Texture => Boolean(t));
+/** Loads and parses one or more spritesheets (PNG + JSON pairs), combining their frames into one list. */
+export async function loadSpritesheets(sheets: SpritesheetPair[]): Promise<LoadedSpritesheets> {
+  const multi = sheets.length > 1;
+  const frames: FrameOption[] = [];
+  const defaultSelectedNames: string[] = [];
+  const dimensionParts: string[] = [];
+  const nameParts: string[] = [];
+  let fileSizeBytes = 0;
+  let gpuMemoryBytes = 0;
 
-  const anim = new AnimatedSprite(playbackTextures.length > 0 ? playbackTextures : frames.map((f) => f.texture));
+  for (const { image, json } of sheets) {
+    const animationTags = extractAnimationTags(json);
+    const { texture, sheet } = await buildSpritesheet(image, json);
+    const prefix = multi ? `${image.name.replace(/\.[^./]+$/, '')}/` : '';
+    const sheetFrames = atlasFrames(sheet).map((f) => ({ name: `${prefix}${f.name}`, texture: f.texture }));
+    frames.push(...sheetFrames);
+
+    const firstTag = Object.keys(animationTags)[0];
+    const taggedNames = firstTag ? animationTags[firstTag].map((name) => `${prefix}${name}`) : [];
+    defaultSelectedNames.push(...(taggedNames.length > 0 ? taggedNames : sheetFrames.map((f) => f.name)));
+
+    fileSizeBytes += image.size;
+    gpuMemoryBytes += texture.width * texture.height * 4;
+    dimensionParts.push(`${texture.width}×${texture.height}`);
+    nameParts.push(image.name);
+  }
+
+  return {
+    label: nameParts.join(' + '),
+    fileSizeBytes,
+    dimensionsLabel: multi ? `${sheets.length} spritesheets (${dimensionParts.join(', ')} px)` : `${dimensionParts[0]} px (atlas)`,
+    gpuMemoryBytes,
+    frames,
+    defaultSelectedNames,
+  };
+}
+
+export interface AnimationConfig {
+  selectedFrameNames: string[];
+  defaultFrameName: string;
+  speed: number;
+}
+
+/** Builds an AnimatedSprite from a subset of frames chosen (via the animation config dialog) out of one or more loaded spritesheets. */
+export function createAnimatedSpriteFromFrames(loaded: LoadedSpritesheets, config: AnimationConfig): CreatedAnimatedSprite {
+  const textureByName = new Map(loaded.frames.map((f) => [f.name, f.texture]));
+  const selected = new Set(config.selectedFrameNames);
+  const orderedNames = loaded.frames.map((f) => f.name).filter((name) => selected.has(name));
+  const textures = orderedNames.map((name) => textureByName.get(name)!);
+
+  const anim = new AnimatedSprite(textures);
   anim.anchor.set(0.5);
-  anim.label = image.name;
-  anim.animationSpeed = 0.15;
-  anim.play();
+  anim.label = loaded.label;
+  anim.animationSpeed = config.speed;
+
+  const startIndex = Math.max(0, orderedNames.indexOf(config.defaultFrameName));
+  anim.gotoAndPlay(startIndex);
 
   const info: AssetInfo = {
     kind: 'animated',
-    label: image.name,
-    fileSizeBytes: image.size,
-    dimensionsLabel: `${texture.width} × ${texture.height} px (atlas)`,
-    gpuMemoryBytes: texture.width * texture.height * 4,
-    frames,
-    playbackFrameNames,
-    currentFrame: playbackFrameNames[0] ?? frames[0]?.name ?? '',
+    label: loaded.label,
+    fileSizeBytes: loaded.fileSizeBytes,
+    dimensionsLabel: loaded.dimensionsLabel,
+    gpuMemoryBytes: loaded.gpuMemoryBytes,
+    frames: loaded.frames,
+    playbackFrameNames: orderedNames,
+    currentFrame: orderedNames[startIndex] ?? orderedNames[0] ?? '',
   };
   return { display: anim, info };
 }

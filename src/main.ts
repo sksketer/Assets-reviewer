@@ -3,11 +3,13 @@ import { createPixiApp } from './pixi/app';
 import { pickFiles } from './ui/fileInput';
 import { Modal } from './ui/modal';
 import { Inspector } from './ui/inspector';
+import { AnimationConfigDialog } from './ui/animationConfigDialog';
 import { validateSpriteFiles, validateAnimationFiles } from './assets/validator';
 import {
   createStaticSprite,
   createSpriteFromSheet,
-  createAnimatedSpriteFromSheet,
+  loadSpritesheets,
+  createAnimatedSpriteFromFrames,
   createAnimatedSpriteFromSequence,
 } from './assets/spriteFactory';
 import type { AssetInfo, AssetMode } from './assets/types';
@@ -25,6 +27,7 @@ async function main() {
 
   const modal = new Modal();
   const inspector = new Inspector();
+  const animConfigDialog = new AnimationConfigDialog();
   const app = await createPixiApp(container);
 
   let currentMode: AssetMode | null = null;
@@ -41,7 +44,7 @@ async function main() {
     setStatus(
       mode === 'sprite'
         ? 'Sprite mode: choose an image, or a PNG + its spritesheet JSON to pick one frame — or drag files onto the canvas.'
-        : 'Animation mode: choose a PNG + JSON spritesheet, or several frame images.',
+        : 'Animation mode: choose one or more PNG + JSON spritesheets, or several frame images.',
     );
   }
 
@@ -95,16 +98,30 @@ async function main() {
       return;
     }
 
+    if (result.type === 'sequence') {
+      try {
+        const { display, info } = await createAnimatedSpriteFromSequence(result.images);
+        placeOnStage(display, info);
+        setStatus(`Added animated sprite from ${result.images.length} frame images.`);
+      } catch (err) {
+        modal.showError(err instanceof Error ? err.message : String(err), 'Failed to Build Animation');
+        setStatus('Failed to add animation.');
+      }
+      return;
+    }
+
+    // Spritesheet(s): let the user configure which frames, default frame, and speed before creating the sprite.
     try {
-      const { display, info } =
-        result.type === 'spritesheet'
-          ? await createAnimatedSpriteFromSheet(result.image, result.json)
-          : await createAnimatedSpriteFromSequence(result.images);
+      const loaded = await loadSpritesheets(result.sheets);
+      const config = await animConfigDialog.open(loaded.label, loaded.frames, loaded.defaultSelectedNames);
+      if (!config) {
+        setStatus('Animation creation cancelled.');
+        return;
+      }
+      const { display, info } = createAnimatedSpriteFromFrames(loaded, config);
       placeOnStage(display, info);
       setStatus(
-        result.type === 'spritesheet'
-          ? `Added animated sprite from spritesheet "${result.image.name}".`
-          : `Added animated sprite from ${result.images.length} frame images.`,
+        `Added animated sprite "${loaded.label}" — ${config.selectedFrameNames.length} frame(s) at ${config.speed.toFixed(2)}x speed.`,
       );
     } catch (err) {
       modal.showError(err instanceof Error ? err.message : String(err), 'Failed to Build Animation');

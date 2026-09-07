@@ -1,4 +1,4 @@
-import type { AnimationValidation, SpriteFileValidation } from './types';
+import type { AnimationValidation, SpriteFileValidation, SpritesheetPair } from './types';
 
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.gif'];
 const JSON_EXTENSIONS = ['.json'];
@@ -56,6 +56,56 @@ async function parseSpritesheetJsonFile(file: File): Promise<{ json: unknown } |
   return { json: parsed };
 }
 
+function baseName(name: string): string {
+  return name.replace(/\.[^./]+$/, '').toLowerCase();
+}
+
+/**
+ * Pairs an arbitrary number of PNGs with an equal number of JSON files, so multiple spritesheets
+ * can be loaded in one go. Each JSON is matched to a PNG via its `meta.image` filename, falling
+ * back to a same-basename match (e.g. "walk.png" + "walk.json").
+ */
+async function pairSpritesheets(images: File[], jsonFiles: File[]): Promise<{ sheets: SpritesheetPair[] } | { error: string }> {
+  if (images.length !== jsonFiles.length) {
+    return {
+      error:
+        `Each spritesheet needs exactly one PNG and one matching JSON. You selected ${images.length} image(s) ` +
+        `and ${jsonFiles.length} JSON file(s) — the counts must match.`,
+    };
+  }
+
+  const usedImageIndexes = new Set<number>();
+  const sheets: SpritesheetPair[] = [];
+
+  for (const jsonFile of jsonFiles) {
+    const parsed = await parseSpritesheetJsonFile(jsonFile);
+    if ('error' in parsed) return { error: parsed.error };
+
+    const meta = isPlainObject(parsed.json) ? parsed.json.meta : undefined;
+    const metaImageName = isPlainObject(meta) && typeof meta.image === 'string' ? meta.image : undefined;
+
+    let matchIndex = -1;
+    if (metaImageName) {
+      matchIndex = images.findIndex((img, i) => !usedImageIndexes.has(i) && baseName(img.name) === baseName(metaImageName));
+    }
+    if (matchIndex === -1) {
+      matchIndex = images.findIndex((img, i) => !usedImageIndexes.has(i) && baseName(img.name) === baseName(jsonFile.name));
+    }
+    if (matchIndex === -1) {
+      return {
+        error:
+          `Could not find a matching PNG for "${jsonFile.name}". Name each spritesheet PNG and its JSON the same ` +
+          '(e.g. "walk.png" + "walk.json"), or make sure the JSON\'s "meta.image" matches an uploaded PNG\'s filename.',
+      };
+    }
+
+    usedImageIndexes.add(matchIndex);
+    sheets.push({ image: images[matchIndex], json: parsed.json });
+  }
+
+  return { sheets };
+}
+
 export async function validateSpriteFiles(files: File[]): Promise<SpriteFileValidation> {
   const images = files.filter(isImageFile);
   const jsonFiles = files.filter(isJsonFile);
@@ -106,27 +156,15 @@ export async function validateAnimationFiles(files: File[]): Promise<AnimationVa
   if (images.length === 0) {
     return {
       valid: false,
-      error: 'Please select at least one image file for the animation (either a spritesheet PNG or several frame images).',
-    };
-  }
-  if (jsonFiles.length > 1) {
-    return {
-      valid: false,
-      error: 'Only one JSON file is allowed for a spritesheet animation.',
+      error: 'Please select at least one image file for the animation (one or more spritesheet PNGs, or several frame images).',
     };
   }
 
-  if (jsonFiles.length === 1) {
-    // Spritesheet mode: exactly one PNG + one JSON is required.
-    if (images.length !== 1) {
-      return {
-        valid: false,
-        error: `A spritesheet animation needs exactly one image and its matching JSON, but ${images.length} images were provided alongside the JSON file.`,
-      };
-    }
-    const result = await parseSpritesheetJsonFile(jsonFiles[0]);
+  if (jsonFiles.length > 0) {
+    // Spritesheet mode: one or more PNG + JSON pairs (a single spritesheet, or several combined into one animation).
+    const result = await pairSpritesheets(images, jsonFiles);
     if ('error' in result) return { valid: false, error: result.error };
-    return { valid: true, type: 'spritesheet', image: images[0], json: result.json };
+    return { valid: true, type: 'spritesheet', sheets: result.sheets };
   }
 
   // No JSON provided.
@@ -134,8 +172,8 @@ export async function validateAnimationFiles(files: File[]): Promise<AnimationVa
     return {
       valid: false,
       error:
-        'An animation needs either a spritesheet (one PNG + its JSON) or multiple frame images. ' +
-        'Only one image was provided without a JSON file — please also select the spritesheet JSON, ' +
+        'An animation needs either one or more spritesheets (PNG + matching JSON each) or multiple frame images. ' +
+        'Only one image was provided without a JSON file — please also select its spritesheet JSON, ' +
         'or select multiple images to build a frame-by-frame animation.',
     };
   }

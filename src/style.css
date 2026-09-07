@@ -329,3 +329,29 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.anim-config-modal {
+  max-width: 440px;
+  text-align: left;
+}
+
+.anim-config-modal h2 {
+  color: var(--text);
+}
+
+.anim-config-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  margin: 0.9rem 0;
+}
+
+.anim-config-frames-list {
+  max-height: 220px;
+}
+
+.anim-config-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
