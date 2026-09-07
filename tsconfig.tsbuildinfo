@@ -1,0 +1,1 @@
+{"root":["./src/main.ts","./src/assets/loadimage.ts","./src/assets/spritefactory.ts","./src/assets/types.ts","./src/assets/validator.ts","./src/pixi/app.ts","./src/ui/fileinput.ts","./src/ui/modal.ts"],"version":"5.9.3"}
