@@ -1,4 +1,3 @@
-import type { Sprite, AnimatedSprite } from 'pixi.js';
 import { createPixiApp } from './pixi/app';
 import { setupSpriteInteractions } from './pixi/interactions';
 import { pickFiles } from './ui/fileInput';
@@ -6,7 +5,8 @@ import { Modal } from './ui/modal';
 import { Inspector } from './ui/inspector';
 import { AnimationConfigDialog } from './ui/animationConfigDialog';
 import { SpriteFrameDialog } from './ui/spriteFrameDialog';
-import { validateSpriteFiles, validateAnimationFiles } from './assets/validator';
+import { BitmapTextConfigDialog } from './ui/bitmapTextConfigDialog';
+import { validateSpriteFiles, validateAnimationFiles, validateBitmapFontFiles } from './assets/validator';
 import {
   createStaticSprite,
   createSpriteFromFrames,
@@ -14,10 +14,12 @@ import {
   createAnimatedSpriteFromFrames,
   createAnimatedSpriteFromSequence,
 } from './assets/spriteFactory';
-import type { AssetInfo, AssetMode } from './assets/types';
+import { loadBitmapFont, createBitmapText } from './assets/bitmapTextFactory';
+import type { AssetInfo, AssetMode, PlaceableDisplay } from './assets/types';
 
 const IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,.png,.jpg,.jpeg,.webp,.gif';
 const ASSET_ACCEPT = `${IMAGE_ACCEPT},application/json,.json`;
+const BITMAP_TEXT_ACCEPT = `${IMAGE_ACCEPT},.fnt,.xml,application/xml,text/xml`;
 
 async function main() {
   const container = document.getElementById('canvas-container')!;
@@ -25,12 +27,14 @@ async function main() {
   const statusMessage = document.getElementById('status-message')!;
   const btnSprite = document.getElementById('btn-add-sprite')!;
   const btnAnimation = document.getElementById('btn-add-animation')!;
+  const btnBitmapText = document.getElementById('btn-add-bitmaptext')!;
   const btnClear = document.getElementById('btn-clear')!;
 
   const modal = new Modal();
   const inspector = new Inspector();
   const animConfigDialog = new AnimationConfigDialog();
   const spriteFrameDialog = new SpriteFrameDialog();
+  const bitmapTextConfigDialog = new BitmapTextConfigDialog();
   const app = await createPixiApp(container);
   const registerInteractive = setupSpriteInteractions(app, inspector);
 
@@ -45,14 +49,17 @@ async function main() {
     currentMode = mode;
     btnSprite.classList.toggle('active', mode === 'sprite');
     btnAnimation.classList.toggle('active', mode === 'animation');
+    btnBitmapText.classList.toggle('active', mode === 'bitmapText');
     setStatus(
       mode === 'sprite'
         ? 'Sprite mode: choose an image, or a PNG + its spritesheet JSON to pick one frame — or drag files onto the canvas.'
-        : 'Animation mode: choose one or more PNG + JSON spritesheets, or several frame images.',
+        : mode === 'animation'
+          ? 'Animation mode: choose one or more PNG + JSON spritesheets, or several frame images.'
+          : 'Bitmap Text mode: choose a bitmap font file (.fnt or .xml) plus its texture PNG(s).',
     );
   }
 
-  function placeOnStage(display: Sprite | AnimatedSprite, info: AssetInfo): void {
+  function placeOnStage(display: PlaceableDisplay, info: AssetInfo): void {
     dropHint.classList.add('hidden');
     const angle = placedCount * 47;
     const radius = Math.min(app.screen.width, app.screen.height) * 0.15;
@@ -108,6 +115,31 @@ async function main() {
       return;
     }
 
+    if (mode === 'bitmapText') {
+      const result = await validateBitmapFontFiles(files);
+      if (!result.valid) {
+        modal.showError(result.error);
+        setStatus('Failed to add bitmap text: invalid assets.');
+        return;
+      }
+
+      try {
+        const loaded = await loadBitmapFont(result.fontData, result.fontFileName, result.images);
+        const config = await bitmapTextConfigDialog.open(loaded.font.fontFamily, loaded.font.baseMeasurementFontSize);
+        if (!config) {
+          setStatus('Bitmap text creation cancelled.');
+          return;
+        }
+        const { display, info } = createBitmapText(loaded, config);
+        placeOnStage(display, info);
+        setStatus(`Added bitmap text "${config.text}" using font "${loaded.font.fontFamily}".`);
+      } catch (err) {
+        modal.showError(err instanceof Error ? err.message : String(err), 'Failed to Build Bitmap Text');
+        setStatus('Failed to add bitmap text.');
+      }
+      return;
+    }
+
     const result = await validateAnimationFiles(files);
     if (!result.valid) {
       modal.showError(result.error);
@@ -158,6 +190,12 @@ async function main() {
     await processFiles('animation', files);
   });
 
+  btnBitmapText.addEventListener('click', async () => {
+    setMode('bitmapText');
+    const files = await pickFiles(BITMAP_TEXT_ACCEPT, true);
+    await processFiles('bitmapText', files);
+  });
+
   btnClear.addEventListener('click', () => {
     app.stage.removeChildren();
     placedCount = 0;
@@ -192,13 +230,13 @@ async function main() {
     if (files.length === 0) return;
 
     if (!currentMode) {
-      modal.showError('Select "+ Sprite" or "+ Animation" from the toolbar first, then drag your files onto the canvas.');
+      modal.showError('Select "+ Sprite", "+ Animation" or "+ Bitmap Text" from the toolbar first, then drag your files onto the canvas.');
       return;
     }
     await processFiles(currentMode, files);
   });
 
-  setStatus('Select "+ Sprite" or "+ Animation" to load assets.');
+  setStatus('Select "+ Sprite", "+ Animation" or "+ Bitmap Text" to load assets.');
 }
 
 main();

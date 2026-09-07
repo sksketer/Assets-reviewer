@@ -1,7 +1,9 @@
-import type { AnimationValidation, SpriteFileValidation, SpritesheetPair } from './types';
+import { bitmapFontTextParser, bitmapFontXMLStringParser } from 'pixi.js';
+import type { AnimationValidation, BitmapFontFilesValidation, SpriteFileValidation, SpritesheetPair } from './types';
 
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.gif'];
 const JSON_EXTENSIONS = ['.json'];
+const FONT_EXTENSIONS = ['.fnt', '.xml'];
 
 function hasExtension(name: string, extensions: string[]): boolean {
   const lower = name.toLowerCase();
@@ -16,6 +18,10 @@ export function isImageFile(file: File): boolean {
 export function isJsonFile(file: File): boolean {
   if (file.type === 'application/json') return true;
   return hasExtension(file.name, JSON_EXTENSIONS);
+}
+
+export function isFontFile(file: File): boolean {
+  return hasExtension(file.name, FONT_EXTENSIONS);
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -179,4 +185,48 @@ export async function validateAnimationFiles(files: File[]): Promise<AnimationVa
   }
 
   return { valid: true, type: 'sequence', images };
+}
+
+export async function validateBitmapFontFiles(files: File[]): Promise<BitmapFontFilesValidation> {
+  const fontFiles = files.filter(isFontFile);
+  const images = files.filter(isImageFile);
+
+  if (fontFiles.length === 0) {
+    return {
+      valid: false,
+      error: 'Please select a bitmap font file (.fnt or .xml) plus the texture PNG(s) it references.',
+    };
+  }
+  if (fontFiles.length > 1) {
+    return { valid: false, error: 'Only one bitmap font file (.fnt or .xml) is allowed.' };
+  }
+  if (images.length === 0) {
+    return {
+      valid: false,
+      error: "Please also select the bitmap font's texture PNG(s) — the image file(s) its pages reference.",
+    };
+  }
+
+  const fontFile = fontFiles[0];
+  const text = await fontFile.text();
+
+  if (!bitmapFontTextParser.test(text) && !bitmapFontXMLStringParser.test(text)) {
+    return {
+      valid: false,
+      error: `"${fontFile.name}" doesn't look like a valid bitmap font file (expected the AngelCode .fnt text format or XML).`,
+    };
+  }
+
+  let fontData;
+  try {
+    fontData = bitmapFontTextParser.test(text) ? bitmapFontTextParser.parse(text) : bitmapFontXMLStringParser.parse(text);
+  } catch {
+    return { valid: false, error: `Failed to parse "${fontFile.name}" as a bitmap font file.` };
+  }
+
+  if (!fontData.pages || fontData.pages.length === 0) {
+    return { valid: false, error: `"${fontFile.name}" doesn't declare any texture pages.` };
+  }
+
+  return { valid: true, fontData, fontFileName: fontFile.name, images };
 }

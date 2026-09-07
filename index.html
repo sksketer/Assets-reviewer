@@ -13,12 +13,13 @@
       <div class="toolbar-actions">
         <button id="btn-add-sprite" type="button" class="toolbar-btn">+ Sprite</button>
         <button id="btn-add-animation" type="button" class="toolbar-btn">+ Animation</button>
+        <button id="btn-add-bitmaptext" type="button" class="toolbar-btn">+ Bitmap Text</button>
         <button id="btn-clear" type="button" class="toolbar-btn toolbar-btn--ghost">Clear Stage</button>
       </div>
     </header>
 
     <main id="canvas-container">
-      <div id="drop-hint">Select "+ Sprite" or "+ Animation", then choose files or drag &amp; drop them here.</div>
+      <div id="drop-hint">Select "+ Sprite", "+ Animation" or "+ Bitmap Text", then choose files or drag &amp; drop them here.</div>
     </main>
 
     <footer id="status-bar">
@@ -78,6 +79,66 @@
     </div>
   </div>
 
+  <div id="bitmaptext-config-overlay" class="modal-overlay">
+    <div class="modal anim-config-modal" role="dialog" aria-modal="true" aria-labelledby="bitmaptext-config-title">
+      <h2 id="bitmaptext-config-title">Configure Bitmap Text</h2>
+      <div class="anim-config-body">
+        <div class="inspector-row">
+          <span class="inspector-label">Font family</span>
+          <span id="bitmaptext-font-family" class="inspector-value"></span>
+        </div>
+        <div class="inspector-select-row">
+          <label for="bitmaptext-text" class="inspector-label">Text</label>
+          <textarea id="bitmaptext-text" class="inspector-select bitmaptext-textarea" rows="3"></textarea>
+        </div>
+        <div class="inspector-row">
+          <label for="bitmaptext-fontsize" class="inspector-label">Font size</label>
+          <input id="bitmaptext-fontsize" type="number" min="1" step="1" class="bitmaptext-number" />
+        </div>
+        <div class="inspector-row">
+          <label for="bitmaptext-fill" class="inspector-label">Fill color</label>
+          <input id="bitmaptext-fill" type="color" class="bitmaptext-color" value="#ffffff" />
+        </div>
+        <div class="inspector-row">
+          <label for="bitmaptext-align" class="inspector-label">Align</label>
+          <select id="bitmaptext-align" class="inspector-select bitmaptext-inline-select">
+            <option value="left">Left</option>
+            <option value="center">Center</option>
+            <option value="right">Right</option>
+            <option value="justify">Justify</option>
+          </select>
+        </div>
+        <div class="inspector-row">
+          <label for="bitmaptext-letterspacing" class="inspector-label">Letter spacing</label>
+          <input id="bitmaptext-letterspacing" type="number" step="0.5" class="bitmaptext-number" value="0" />
+        </div>
+        <div class="inspector-row">
+          <label for="bitmaptext-wordwrap" class="inspector-label">Word wrap</label>
+          <input id="bitmaptext-wordwrap" type="checkbox" />
+        </div>
+        <div id="bitmaptext-wordwrapwidth-row" class="inspector-row hidden">
+          <label for="bitmaptext-wordwrapwidth" class="inspector-label">Word wrap width</label>
+          <input id="bitmaptext-wordwrapwidth" type="number" min="10" step="10" class="bitmaptext-number" value="200" />
+        </div>
+        <div class="inspector-row">
+          <span class="inspector-label">Anchor (x / y)</span>
+          <div class="bitmaptext-anchor-control">
+            <input id="bitmaptext-anchorx" type="number" min="0" max="1" step="0.1" value="0.5" class="bitmaptext-number bitmaptext-number--small" />
+            <input id="bitmaptext-anchory" type="number" min="0" max="1" step="0.1" value="0.5" class="bitmaptext-number bitmaptext-number--small" />
+          </div>
+        </div>
+        <div class="inspector-row">
+          <label for="bitmaptext-roundpixels" class="inspector-label">Round pixels</label>
+          <input id="bitmaptext-roundpixels" type="checkbox" />
+        </div>
+      </div>
+      <div class="anim-config-actions">
+        <button id="bitmaptext-config-cancel" type="button" class="toolbar-btn toolbar-btn--ghost">Cancel</button>
+        <button id="bitmaptext-config-confirm" type="button" class="toolbar-btn">Create Text</button>
+      </div>
+    </div>
+  </div>
+
   <div id="inspector-panel" class="inspector-panel hidden">
     <div id="inspector-header" class="inspector-header">
       <span id="inspector-title" class="inspector-title">Sprite</span>
@@ -105,7 +166,7 @@
         <span id="inspector-gpu" class="inspector-value"></span>
       </div>
       <div class="inspector-row">
-        <span class="inspector-label">Current frame</span>
+        <span id="inspector-frame-label" class="inspector-label">Current frame</span>
         <span id="inspector-frame" class="inspector-value"></span>
       </div>
       <div id="inspector-playback-row" class="inspector-row hidden">
