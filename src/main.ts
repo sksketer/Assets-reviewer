@@ -1,34 +1,44 @@
 import type { Sprite, AnimatedSprite } from 'pixi.js';
 import { createPixiApp } from './pixi/app';
+import { setupSpriteInteractions } from './pixi/interactions';
 import { pickFiles } from './ui/fileInput';
 import { Modal } from './ui/modal';
+import { Inspector } from './ui/inspector';
+import { AnimationConfigDialog } from './ui/animationConfigDialog';
+import { SpriteFrameDialog } from './ui/spriteFrameDialog';
 import { validateSpriteFiles, validateAnimationFiles } from './assets/validator';
 import {
   createStaticSprite,
-  createAnimatedSpriteFromSheet,
+  createSpriteFromFrames,
+  loadSpritesheets,
+  createAnimatedSpriteFromFrames,
   createAnimatedSpriteFromSequence,
 } from './assets/spriteFactory';
-import type { AssetMode } from './assets/types';
+import type { AssetInfo, AssetMode } from './assets/types';
 
-const SPRITE_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,.png,.jpg,.jpeg,.webp,.gif';
-const ANIMATION_ACCEPT = `${SPRITE_ACCEPT},application/json,.json`;
+const IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,.png,.jpg,.jpeg,.webp,.gif';
+const ASSET_ACCEPT = `${IMAGE_ACCEPT},application/json,.json`;
 
 async function main() {
   const container = document.getElementById('canvas-container')!;
   const dropHint = document.getElementById('drop-hint')!;
-  const statusBar = document.getElementById('status-bar')!;
+  const statusMessage = document.getElementById('status-message')!;
   const btnSprite = document.getElementById('btn-add-sprite')!;
   const btnAnimation = document.getElementById('btn-add-animation')!;
   const btnClear = document.getElementById('btn-clear')!;
 
   const modal = new Modal();
+  const inspector = new Inspector();
+  const animConfigDialog = new AnimationConfigDialog();
+  const spriteFrameDialog = new SpriteFrameDialog();
   const app = await createPixiApp(container);
+  const registerInteractive = setupSpriteInteractions(app, inspector);
 
   let currentMode: AssetMode | null = null;
   let placedCount = 0;
 
   function setStatus(message: string): void {
-    statusBar.textContent = message;
+    statusMessage.textContent = message;
   }
 
   function setMode(mode: AssetMode): void {
@@ -37,12 +47,12 @@ async function main() {
     btnAnimation.classList.toggle('active', mode === 'animation');
     setStatus(
       mode === 'sprite'
-        ? 'Sprite mode: choose an image file, or drag one onto the canvas.'
-        : 'Animation mode: choose a PNG + JSON spritesheet, or several frame images.',
+        ? 'Sprite mode: choose an image, or a PNG + its spritesheet JSON to pick one frame — or drag files onto the canvas.'
+        : 'Animation mode: choose one or more PNG + JSON spritesheets, or several frame images.',
     );
   }
 
-  function placeOnStage(display: Sprite | AnimatedSprite): void {
+  function placeOnStage(display: Sprite | AnimatedSprite, info: AssetInfo): void {
     dropHint.classList.add('hidden');
     const angle = placedCount * 47;
     const radius = Math.min(app.screen.width, app.screen.height) * 0.15;
@@ -51,6 +61,8 @@ async function main() {
 
     display.x = app.screen.width / 2 + offsetX;
     display.y = app.screen.height / 2 + offsetY;
+    registerInteractive(display, info);
+
     app.stage.addChild(display);
     placedCount += 1;
   }
@@ -59,16 +71,36 @@ async function main() {
     if (files.length === 0) return;
 
     if (mode === 'sprite') {
-      const result = validateSpriteFiles(files);
+      const result = await validateSpriteFiles(files);
       if (!result.valid) {
         modal.showError(result.error);
         setStatus('Failed to add sprite: invalid assets.');
         return;
       }
+
+      if (result.type === 'plain') {
+        try {
+          const { display, info } = await createStaticSprite(result.file);
+          placeOnStage(display, info);
+          setStatus(`Added sprite "${result.file.name}".`);
+        } catch (err) {
+          modal.showError(err instanceof Error ? err.message : String(err), 'Failed to Load Image');
+          setStatus('Failed to add sprite.');
+        }
+        return;
+      }
+
+      // Spritesheet: let the user pick which frame to display before creating the sprite.
       try {
-        const sprite = await createStaticSprite(result.file);
-        placeOnStage(sprite);
-        setStatus(`Added sprite "${result.file.name}".`);
+        const loaded = await loadSpritesheets([{ image: result.image, json: result.json }]);
+        const frameName = await spriteFrameDialog.open(loaded.label, loaded.frames);
+        if (!frameName) {
+          setStatus('Sprite creation cancelled.');
+          return;
+        }
+        const { display, info } = createSpriteFromFrames(loaded, frameName);
+        placeOnStage(display, info);
+        setStatus(`Added sprite showing frame "${frameName}" from spritesheet "${result.image.name}".`);
       } catch (err) {
         modal.showError(err instanceof Error ? err.message : String(err), 'Failed to Load Image');
         setStatus('Failed to add sprite.');
@@ -83,16 +115,30 @@ async function main() {
       return;
     }
 
+    if (result.type === 'sequence') {
+      try {
+        const { display, info } = await createAnimatedSpriteFromSequence(result.images);
+        placeOnStage(display, info);
+        setStatus(`Added animated sprite from ${result.images.length} frame images.`);
+      } catch (err) {
+        modal.showError(err instanceof Error ? err.message : String(err), 'Failed to Build Animation');
+        setStatus('Failed to add animation.');
+      }
+      return;
+    }
+
+    // Spritesheet(s): let the user configure which frames, default frame, and speed before creating the sprite.
     try {
-      const anim =
-        result.type === 'spritesheet'
-          ? await createAnimatedSpriteFromSheet(result.image, result.json)
-          : await createAnimatedSpriteFromSequence(result.images);
-      placeOnStage(anim);
+      const loaded = await loadSpritesheets(result.sheets);
+      const config = await animConfigDialog.open(loaded.label, loaded.frames, loaded.defaultSelectedNames);
+      if (!config) {
+        setStatus('Animation creation cancelled.');
+        return;
+      }
+      const { display, info } = createAnimatedSpriteFromFrames(loaded, config);
+      placeOnStage(display, info);
       setStatus(
-        result.type === 'spritesheet'
-          ? `Added animated sprite from spritesheet "${result.image.name}".`
-          : `Added animated sprite from ${result.images.length} frame images.`,
+        `Added animated sprite "${loaded.label}" — ${config.selectedFrameNames.length} frame(s) at ${config.speed.toFixed(2)}x speed.`,
       );
     } catch (err) {
       modal.showError(err instanceof Error ? err.message : String(err), 'Failed to Build Animation');
@@ -102,13 +148,13 @@ async function main() {
 
   btnSprite.addEventListener('click', async () => {
     setMode('sprite');
-    const files = await pickFiles(SPRITE_ACCEPT, false);
+    const files = await pickFiles(ASSET_ACCEPT, true);
     await processFiles('sprite', files);
   });
 
   btnAnimation.addEventListener('click', async () => {
     setMode('animation');
-    const files = await pickFiles(ANIMATION_ACCEPT, true);
+    const files = await pickFiles(ASSET_ACCEPT, true);
     await processFiles('animation', files);
   });
 
@@ -116,8 +162,18 @@ async function main() {
     app.stage.removeChildren();
     placedCount = 0;
     dropHint.classList.remove('hidden');
+    inspector.hide();
     setStatus('Stage cleared.');
   });
+
+  // Prevent ctrl+wheel/pinch over the canvas from zooming the whole page — sprites handle it themselves.
+  container.addEventListener(
+    'wheel',
+    (e) => {
+      if (e.ctrlKey) e.preventDefault();
+    },
+    { passive: false },
+  );
 
   container.addEventListener('dragover', (e) => {
     e.preventDefault();
