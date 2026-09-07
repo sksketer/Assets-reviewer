@@ -4,10 +4,11 @@ import { pickFiles } from './ui/fileInput';
 import { Modal } from './ui/modal';
 import { Inspector } from './ui/inspector';
 import { AnimationConfigDialog } from './ui/animationConfigDialog';
+import { SpriteFrameDialog } from './ui/spriteFrameDialog';
 import { validateSpriteFiles, validateAnimationFiles } from './assets/validator';
 import {
   createStaticSprite,
-  createSpriteFromSheet,
+  createSpriteFromFrames,
   loadSpritesheets,
   createAnimatedSpriteFromFrames,
   createAnimatedSpriteFromSequence,
@@ -28,6 +29,7 @@ async function main() {
   const modal = new Modal();
   const inspector = new Inspector();
   const animConfigDialog = new AnimationConfigDialog();
+  const spriteFrameDialog = new SpriteFrameDialog();
   const app = await createPixiApp(container);
 
   let currentMode: AssetMode | null = null;
@@ -75,15 +77,30 @@ async function main() {
         setStatus('Failed to add sprite: invalid assets.');
         return;
       }
+
+      if (result.type === 'plain') {
+        try {
+          const { display, info } = await createStaticSprite(result.file);
+          placeOnStage(display, info);
+          setStatus(`Added sprite "${result.file.name}".`);
+        } catch (err) {
+          modal.showError(err instanceof Error ? err.message : String(err), 'Failed to Load Image');
+          setStatus('Failed to add sprite.');
+        }
+        return;
+      }
+
+      // Spritesheet: let the user pick which frame to display before creating the sprite.
       try {
-        const { display, info } =
-          result.type === 'plain' ? await createStaticSprite(result.file) : await createSpriteFromSheet(result.image, result.json);
+        const loaded = await loadSpritesheets([{ image: result.image, json: result.json }]);
+        const frameName = await spriteFrameDialog.open(loaded.label, loaded.frames);
+        if (!frameName) {
+          setStatus('Sprite creation cancelled.');
+          return;
+        }
+        const { display, info } = createSpriteFromFrames(loaded, frameName);
         placeOnStage(display, info);
-        setStatus(
-          result.type === 'plain'
-            ? `Added sprite "${result.file.name}".`
-            : `Added sprite showing frame "${info.currentFrame}" from spritesheet "${result.image.name}".`,
-        );
+        setStatus(`Added sprite showing frame "${frameName}" from spritesheet "${result.image.name}".`);
       } catch (err) {
         modal.showError(err instanceof Error ? err.message : String(err), 'Failed to Load Image');
         setStatus('Failed to add sprite.');

@@ -65,28 +65,6 @@ export async function createStaticSprite(file: File): Promise<CreatedSprite> {
   return { display: sprite, info };
 }
 
-export async function createSpriteFromSheet(image: File, jsonData: unknown): Promise<CreatedSprite> {
-  const { texture, sheet } = await buildSpritesheet(image, jsonData);
-  const frames = atlasFrames(sheet);
-  const first = frames[0];
-
-  const sprite = new Sprite(first.texture);
-  sprite.anchor.set(0.5);
-  sprite.label = image.name;
-
-  const info: AssetInfo = {
-    kind: 'sprite',
-    label: image.name,
-    fileSizeBytes: image.size,
-    dimensionsLabel: `${texture.width} × ${texture.height} px (atlas)`,
-    gpuMemoryBytes: texture.width * texture.height * 4,
-    frames,
-    playbackFrameNames: null,
-    currentFrame: first.name,
-  };
-  return { display: sprite, info };
-}
-
 export interface LoadedSpritesheets {
   label: string;
   fileSizeBytes: number;
@@ -133,6 +111,27 @@ export async function loadSpritesheets(sheets: SpritesheetPair[]): Promise<Loade
     frames,
     defaultSelectedNames,
   };
+}
+
+/** Builds a static Sprite showing one chosen frame (picked via the sprite frame dialog) out of a loaded spritesheet. */
+export function createSpriteFromFrames(loaded: LoadedSpritesheets, selectedFrameName: string): CreatedSprite {
+  const frame = loaded.frames.find((f) => f.name === selectedFrameName) ?? loaded.frames[0];
+
+  const sprite = new Sprite(frame.texture);
+  sprite.anchor.set(0.5);
+  sprite.label = loaded.label;
+
+  const info: AssetInfo = {
+    kind: 'sprite',
+    label: loaded.label,
+    fileSizeBytes: loaded.fileSizeBytes,
+    dimensionsLabel: loaded.dimensionsLabel,
+    gpuMemoryBytes: loaded.gpuMemoryBytes,
+    frames: loaded.frames,
+    playbackFrameNames: null,
+    currentFrame: frame.name,
+  };
+  return { display: sprite, info };
 }
 
 export interface AnimationConfig {
