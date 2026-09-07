@@ -1,7 +1,10 @@
+import type { Texture } from 'pixi.js';
+
 export type AssetMode = 'sprite' | 'animation';
 
-export interface SpriteValidation {
+export interface PlainSpriteValidation {
   valid: true;
+  type: 'plain';
   file: File;
 }
 
@@ -23,5 +26,25 @@ export interface InvalidValidation {
   error: string;
 }
 
+export type SpriteFileValidation = PlainSpriteValidation | SpritesheetValidation | InvalidValidation;
 export type AnimationValidation = SpritesheetValidation | SequenceValidation | InvalidValidation;
-export type SpriteFileValidation = SpriteValidation | InvalidValidation;
+
+export interface FrameOption {
+  name: string;
+  texture: Texture;
+}
+
+/** Metadata tracked alongside a placed Sprite/AnimatedSprite, shown in the inspector panel. */
+export interface AssetInfo {
+  kind: 'sprite' | 'animated';
+  label: string;
+  fileSizeBytes: number;
+  dimensionsLabel: string;
+  gpuMemoryBytes: number;
+  /** All frames the user can pick from in the inspector's frame selector. */
+  frames: FrameOption[];
+  /** For an AnimatedSprite, the frame names in the exact order of its `.textures` (so `playbackFrameNames[currentFrame]` gives the name). Null for a plain Sprite. */
+  playbackFrameNames: string[] | null;
+  /** Mutable: the name of the frame currently displayed, kept in sync by the inspector. */
+  currentFrame: string;
+}

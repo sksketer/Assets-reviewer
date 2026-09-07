@@ -18,37 +18,11 @@ export function isJsonFile(file: File): boolean {
   return hasExtension(file.name, JSON_EXTENSIONS);
 }
 
-export function validateSpriteFiles(files: File[]): SpriteFileValidation {
-  const images = files.filter(isImageFile);
-  const jsonFiles = files.filter(isJsonFile);
-
-  if (images.length === 0) {
-    return {
-      valid: false,
-      error: 'Please select an image file (PNG, JPG, WEBP or GIF) to create a sprite.',
-    };
-  }
-  if (jsonFiles.length > 0) {
-    return {
-      valid: false,
-      error: 'A static sprite only needs a single image file. Remove the JSON file, or use "+ Animation" for a spritesheet.',
-    };
-  }
-  if (images.length > 1) {
-    return {
-      valid: false,
-      error: `A static sprite needs exactly one image, but ${images.length} were provided. Please select a single image file.`,
-    };
-  }
-
-  return { valid: true, file: images[0] };
-}
-
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function validateSpritesheetJson(json: unknown): string | null {
+function validateSpritesheetJsonShape(json: unknown): string | null {
   if (!isPlainObject(json)) {
     return 'The spritesheet JSON must be an object with a "frames" section.';
   }
@@ -66,6 +40,63 @@ function validateSpritesheetJson(json: unknown): string | null {
     }
   }
   return null;
+}
+
+async function parseSpritesheetJsonFile(file: File): Promise<{ json: unknown } | { error: string }> {
+  let parsed: unknown;
+  try {
+    const text = await file.text();
+    parsed = JSON.parse(text);
+  } catch {
+    return { error: `"${file.name}" is not valid JSON. Please provide the spritesheet JSON exported alongside the PNG.` };
+  }
+
+  const shapeError = validateSpritesheetJsonShape(parsed);
+  if (shapeError) return { error: shapeError };
+  return { json: parsed };
+}
+
+export async function validateSpriteFiles(files: File[]): Promise<SpriteFileValidation> {
+  const images = files.filter(isImageFile);
+  const jsonFiles = files.filter(isJsonFile);
+
+  if (images.length === 0) {
+    return {
+      valid: false,
+      error:
+        'Please select an image file (PNG, JPG, WEBP or GIF) to create a sprite — ' +
+        'or a PNG plus its spritesheet JSON to create a sprite from one frame of a spritesheet.',
+    };
+  }
+  if (jsonFiles.length > 1) {
+    return {
+      valid: false,
+      error: 'Only one JSON file is allowed when creating a sprite from a spritesheet.',
+    };
+  }
+
+  if (jsonFiles.length === 1) {
+    if (images.length !== 1) {
+      return {
+        valid: false,
+        error: `A spritesheet sprite needs exactly one image and its matching JSON, but ${images.length} images were provided alongside the JSON file.`,
+      };
+    }
+    const result = await parseSpritesheetJsonFile(jsonFiles[0]);
+    if ('error' in result) return { valid: false, error: result.error };
+    return { valid: true, type: 'spritesheet', image: images[0], json: result.json };
+  }
+
+  if (images.length > 1) {
+    return {
+      valid: false,
+      error:
+        `A static sprite needs exactly one image, but ${images.length} were provided. ` +
+        'Select a single image, or a PNG plus its JSON to pick a frame from a spritesheet.',
+    };
+  }
+
+  return { valid: true, type: 'plain', file: images[0] };
 }
 
 export async function validateAnimationFiles(files: File[]): Promise<AnimationValidation> {
@@ -93,25 +124,9 @@ export async function validateAnimationFiles(files: File[]): Promise<AnimationVa
         error: `A spritesheet animation needs exactly one image and its matching JSON, but ${images.length} images were provided alongside the JSON file.`,
       };
     }
-
-    const jsonFile = jsonFiles[0];
-    let parsed: unknown;
-    try {
-      const text = await jsonFile.text();
-      parsed = JSON.parse(text);
-    } catch {
-      return {
-        valid: false,
-        error: `"${jsonFile.name}" is not valid JSON. Please provide the spritesheet JSON exported alongside the PNG.`,
-      };
-    }
-
-    const jsonError = validateSpritesheetJson(parsed);
-    if (jsonError) {
-      return { valid: false, error: jsonError };
-    }
-
-    return { valid: true, type: 'spritesheet', image: images[0], json: parsed };
+    const result = await parseSpritesheetJsonFile(jsonFiles[0]);
+    if ('error' in result) return { valid: false, error: result.error };
+    return { valid: true, type: 'spritesheet', image: images[0], json: result.json };
   }
 
   // No JSON provided.

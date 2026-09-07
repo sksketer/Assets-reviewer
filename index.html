@@ -32,6 +32,47 @@
     </div>
   </div>
 
+  <div id="inspector-panel" class="inspector-panel hidden">
+    <div id="inspector-header" class="inspector-header">
+      <span id="inspector-title" class="inspector-title">Sprite</span>
+      <button id="inspector-close" type="button" class="inspector-close" aria-label="Close panel">&times;</button>
+    </div>
+    <div class="inspector-body">
+      <div class="inspector-row">
+        <span class="inspector-label">Source</span>
+        <span id="inspector-source" class="inspector-value"></span>
+      </div>
+      <div class="inspector-row">
+        <span class="inspector-label">Type</span>
+        <span id="inspector-type" class="inspector-value"></span>
+      </div>
+      <div class="inspector-row">
+        <span class="inspector-label">File size</span>
+        <span id="inspector-filesize" class="inspector-value"></span>
+      </div>
+      <div class="inspector-row">
+        <span class="inspector-label">Dimensions</span>
+        <span id="inspector-dimensions" class="inspector-value"></span>
+      </div>
+      <div class="inspector-row">
+        <span class="inspector-label">GPU memory (est.)</span>
+        <span id="inspector-gpu" class="inspector-value"></span>
+      </div>
+      <div class="inspector-row">
+        <span class="inspector-label">Current frame</span>
+        <span id="inspector-frame" class="inspector-value"></span>
+      </div>
+      <div id="inspector-playback-row" class="inspector-row hidden">
+        <span class="inspector-label">Playback</span>
+        <button id="inspector-play-toggle" type="button" class="toolbar-btn toolbar-btn--ghost inspector-play-btn">Pause</button>
+      </div>
+      <div id="inspector-frame-select-row" class="inspector-select-row hidden">
+        <label for="inspector-frame-select" class="inspector-label">Change frame texture</label>
+        <select id="inspector-frame-select" class="inspector-select"></select>
+      </div>
+    </div>
+  </div>
+
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

@@ -2,16 +2,18 @@ import type { Sprite, AnimatedSprite } from 'pixi.js';
 import { createPixiApp } from './pixi/app';
 import { pickFiles } from './ui/fileInput';
 import { Modal } from './ui/modal';
+import { Inspector } from './ui/inspector';
 import { validateSpriteFiles, validateAnimationFiles } from './assets/validator';
 import {
   createStaticSprite,
+  createSpriteFromSheet,
   createAnimatedSpriteFromSheet,
   createAnimatedSpriteFromSequence,
 } from './assets/spriteFactory';
-import type { AssetMode } from './assets/types';
+import type { AssetInfo, AssetMode } from './assets/types';
 
-const SPRITE_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,.png,.jpg,.jpeg,.webp,.gif';
-const ANIMATION_ACCEPT = `${SPRITE_ACCEPT},application/json,.json`;
+const IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,.png,.jpg,.jpeg,.webp,.gif';
+const ASSET_ACCEPT = `${IMAGE_ACCEPT},application/json,.json`;
 
 async function main() {
   const container = document.getElementById('canvas-container')!;
@@ -22,6 +24,7 @@ async function main() {
   const btnClear = document.getElementById('btn-clear')!;
 
   const modal = new Modal();
+  const inspector = new Inspector();
   const app = await createPixiApp(container);
 
   let currentMode: AssetMode | null = null;
@@ -37,12 +40,12 @@ async function main() {
     btnAnimation.classList.toggle('active', mode === 'animation');
     setStatus(
       mode === 'sprite'
-        ? 'Sprite mode: choose an image file, or drag one onto the canvas.'
+        ? 'Sprite mode: choose an image, or a PNG + its spritesheet JSON to pick one frame — or drag files onto the canvas.'
         : 'Animation mode: choose a PNG + JSON spritesheet, or several frame images.',
     );
   }
 
-  function placeOnStage(display: Sprite | AnimatedSprite): void {
+  function placeOnStage(display: Sprite | AnimatedSprite, info: AssetInfo): void {
     dropHint.classList.add('hidden');
     const angle = placedCount * 47;
     const radius = Math.min(app.screen.width, app.screen.height) * 0.15;
@@ -51,6 +54,10 @@ async function main() {
 
     display.x = app.screen.width / 2 + offsetX;
     display.y = app.screen.height / 2 + offsetY;
+    display.eventMode = 'static';
+    display.cursor = 'pointer';
+    display.on('pointertap', () => inspector.show(display, info));
+
     app.stage.addChild(display);
     placedCount += 1;
   }
@@ -59,16 +66,21 @@ async function main() {
     if (files.length === 0) return;
 
     if (mode === 'sprite') {
-      const result = validateSpriteFiles(files);
+      const result = await validateSpriteFiles(files);
       if (!result.valid) {
         modal.showError(result.error);
         setStatus('Failed to add sprite: invalid assets.');
         return;
       }
       try {
-        const sprite = await createStaticSprite(result.file);
-        placeOnStage(sprite);
-        setStatus(`Added sprite "${result.file.name}".`);
+        const { display, info } =
+          result.type === 'plain' ? await createStaticSprite(result.file) : await createSpriteFromSheet(result.image, result.json);
+        placeOnStage(display, info);
+        setStatus(
+          result.type === 'plain'
+            ? `Added sprite "${result.file.name}".`
+            : `Added sprite showing frame "${info.currentFrame}" from spritesheet "${result.image.name}".`,
+        );
       } catch (err) {
         modal.showError(err instanceof Error ? err.message : String(err), 'Failed to Load Image');
         setStatus('Failed to add sprite.');
@@ -84,11 +96,11 @@ async function main() {
     }
 
     try {
-      const anim =
+      const { display, info } =
         result.type === 'spritesheet'
           ? await createAnimatedSpriteFromSheet(result.image, result.json)
           : await createAnimatedSpriteFromSequence(result.images);
-      placeOnStage(anim);
+      placeOnStage(display, info);
       setStatus(
         result.type === 'spritesheet'
           ? `Added animated sprite from spritesheet "${result.image.name}".`
@@ -102,13 +114,13 @@ async function main() {
 
   btnSprite.addEventListener('click', async () => {
     setMode('sprite');
-    const files = await pickFiles(SPRITE_ACCEPT, false);
+    const files = await pickFiles(ASSET_ACCEPT, true);
     await processFiles('sprite', files);
   });
 
   btnAnimation.addEventListener('click', async () => {
     setMode('animation');
-    const files = await pickFiles(ANIMATION_ACCEPT, true);
+    const files = await pickFiles(ASSET_ACCEPT, true);
     await processFiles('animation', files);
   });
 
@@ -116,6 +128,7 @@ async function main() {
     app.stage.removeChildren();
     placedCount = 0;
     dropHint.classList.remove('hidden');
+    inspector.hide();
     setStatus('Stage cleared.');
   });
 
