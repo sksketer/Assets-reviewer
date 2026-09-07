@@ -1,6 +1,9 @@
-import type { Texture } from 'pixi.js';
+import type { AnimatedSprite, BitmapFontData, BitmapText, Sprite, Texture } from 'pixi.js';
 
-export type AssetMode = 'sprite' | 'animation';
+export type AssetMode = 'sprite' | 'animation' | 'bitmapText';
+
+/** Any display object this app can place on stage, drag, scale, and inspect. */
+export type PlaceableDisplay = Sprite | AnimatedSprite | BitmapText;
 
 export interface PlainSpriteValidation {
   valid: true;
@@ -40,14 +43,23 @@ export interface InvalidValidation {
 export type SpriteFileValidation = PlainSpriteValidation | SpritesheetValidation | InvalidValidation;
 export type AnimationValidation = MultiSpritesheetValidation | SequenceValidation | InvalidValidation;
 
+export interface BitmapFontValidation {
+  valid: true;
+  fontData: BitmapFontData;
+  fontFileName: string;
+  images: File[];
+}
+
+export type BitmapFontFilesValidation = BitmapFontValidation | InvalidValidation;
+
 export interface FrameOption {
   name: string;
   texture: Texture;
 }
 
-/** Metadata tracked alongside a placed Sprite/AnimatedSprite, shown in the inspector panel. */
+/** Metadata tracked alongside a placed Sprite/AnimatedSprite/BitmapText, shown in the inspector panel. */
 export interface AssetInfo {
-  kind: 'sprite' | 'animated';
+  kind: 'sprite' | 'animated' | 'text';
   label: string;
   fileSizeBytes: number;
   dimensionsLabel: string;

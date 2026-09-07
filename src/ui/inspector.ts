@@ -1,9 +1,15 @@
 import type { AnimatedSprite, Sprite } from 'pixi.js';
-import type { AssetInfo } from '../assets/types';
+import type { AssetInfo, PlaceableDisplay } from '../assets/types';
 import { formatBytes } from '../assets/format';
 import { makeDraggable } from './draggable';
 
 const REFRESH_INTERVAL_MS = 150;
+
+const TYPE_LABELS: Record<AssetInfo['kind'], string> = {
+  sprite: 'Sprite',
+  animated: 'Animated Sprite',
+  text: 'Bitmap Text',
+};
 
 export class Inspector {
   private panel: HTMLElement;
@@ -13,6 +19,7 @@ export class Inspector {
   private fileSizeEl: HTMLElement;
   private dimensionsEl: HTMLElement;
   private gpuEl: HTMLElement;
+  private frameLabelEl: HTMLElement;
   private frameEl: HTMLElement;
   private playbackRow: HTMLElement;
   private playToggle: HTMLButtonElement;
@@ -25,7 +32,7 @@ export class Inspector {
   private framesList: HTMLElement;
   private closeBtn: HTMLElement;
 
-  private current: { display: Sprite | AnimatedSprite; info: AssetInfo } | null = null;
+  private current: { display: PlaceableDisplay; info: AssetInfo } | null = null;
   private refreshHandle: number | null = null;
 
   constructor() {
@@ -36,6 +43,7 @@ export class Inspector {
     this.fileSizeEl = document.getElementById('inspector-filesize')!;
     this.dimensionsEl = document.getElementById('inspector-dimensions')!;
     this.gpuEl = document.getElementById('inspector-gpu')!;
+    this.frameLabelEl = document.getElementById('inspector-frame-label')!;
     this.frameEl = document.getElementById('inspector-frame')!;
     this.playbackRow = document.getElementById('inspector-playback-row')!;
     this.playToggle = document.getElementById('inspector-play-toggle') as HTMLButtonElement;
@@ -56,7 +64,7 @@ export class Inspector {
     makeDraggable(this.panel, document.getElementById('inspector-header')!);
   }
 
-  show(display: Sprite | AnimatedSprite, info: AssetInfo): void {
+  show(display: PlaceableDisplay, info: AssetInfo): void {
     this.current = { display, info };
     this.panel.classList.remove('hidden');
     if (!this.panel.style.left && !this.panel.style.top) {
@@ -74,7 +82,7 @@ export class Inspector {
   }
 
   /** Call when a display object might have been removed from the stage, so the panel doesn't linger on stale data. */
-  hideIfShowing(display: Sprite | AnimatedSprite): void {
+  hideIfShowing(display: PlaceableDisplay): void {
     if (this.current?.display === display) this.hide();
   }
 
@@ -85,7 +93,8 @@ export class Inspector {
 
     this.title.textContent = info.label;
     this.sourceEl.textContent = info.label;
-    this.typeEl.textContent = isAnimated ? 'Animated Sprite' : 'Sprite';
+    this.typeEl.textContent = TYPE_LABELS[info.kind];
+    this.frameLabelEl.textContent = info.kind === 'text' ? 'Text' : 'Current frame';
     this.fileSizeEl.textContent = formatBytes(info.fileSizeBytes);
     this.dimensionsEl.textContent = info.dimensionsLabel;
     this.gpuEl.textContent = formatBytes(info.gpuMemoryBytes);
@@ -177,7 +186,9 @@ export class Inspector {
     if (info.kind === 'animated') {
       (display as AnimatedSprite).stop();
     }
-    display.texture = frame.texture;
+    // Only Sprite/AnimatedSprite ever reach here: the select row is hidden whenever frames.length <= 1,
+    // which is always true for BitmapText (frames is always empty).
+    (display as Sprite | AnimatedSprite).texture = frame.texture;
     info.currentFrame = name;
     this.updateDynamic();
   }

@@ -1,6 +1,6 @@
-import type { Application, AnimatedSprite, FederatedPointerEvent, FederatedWheelEvent, Sprite } from 'pixi.js';
+import type { Application, FederatedPointerEvent, FederatedWheelEvent } from 'pixi.js';
 import type { Inspector } from '../ui/inspector';
-import type { AssetInfo } from '../assets/types';
+import type { AssetInfo, PlaceableDisplay } from '../assets/types';
 
 const DRAG_THRESHOLD = 4;
 const MIN_SCALE = 0.1;
@@ -8,7 +8,7 @@ const MAX_SCALE = 6;
 const WHEEL_SENSITIVITY = 0.0015;
 
 interface DragState {
-  display: Sprite | AnimatedSprite;
+  display: PlaceableDisplay;
   info: AssetInfo;
   startPointer: { x: number; y: number };
   startPosition: { x: number; y: number };
@@ -16,10 +16,10 @@ interface DragState {
 }
 
 /**
- * Wires up drag-to-reposition and ctrl+wheel/pinch-to-scale for placed sprites.
+ * Wires up drag-to-reposition and ctrl+wheel/pinch-to-scale for placed sprites/text.
  * Returns a function to call on each newly placed display object.
  */
-export function setupSpriteInteractions(app: Application, inspector: Inspector): (display: Sprite | AnimatedSprite, info: AssetInfo) => void {
+export function setupSpriteInteractions(app: Application, inspector: Inspector): (display: PlaceableDisplay, info: AssetInfo) => void {
   // The stage must be hit-testable everywhere (not just where children are) so it keeps
   // receiving pointermove/pointerup while a drag carries the pointer off the sprite's own bounds.
   app.stage.eventMode = 'static';
