@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sprite Assets Viewer</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header id="toolbar">
+      <div class="toolbar-brand">Sprite Assets Viewer</div>
+      <div class="toolbar-actions">
+        <button id="btn-add-sprite" type="button" class="toolbar-btn">+ Sprite</button>
+        <button id="btn-add-animation" type="button" class="toolbar-btn">+ Animation</button>
+        <button id="btn-clear" type="button" class="toolbar-btn toolbar-btn--ghost">Clear Stage</button>
+      </div>
+    </header>
+
+    <main id="canvas-container">
+      <div id="drop-hint">Select "+ Sprite" or "+ Animation", then choose files or drag &amp; drop them here.</div>
+    </main>
+
+    <footer id="status-bar">Ready.</footer>
+  </div>
+
+  <div id="modal-overlay" class="modal-overlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <h2 id="modal-title">Invalid Assets</h2>
+      <p id="modal-message"></p>
+      <button id="modal-close" type="button" class="toolbar-btn">Close</button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
