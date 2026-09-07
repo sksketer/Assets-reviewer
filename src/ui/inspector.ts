@@ -31,11 +31,12 @@ export class Inspector {
   private framesRow: HTMLElement;
   private framesList: HTMLElement;
   private closeBtn: HTMLElement;
+  private removeBtn: HTMLButtonElement;
 
   private current: { display: PlaceableDisplay; info: AssetInfo } | null = null;
   private refreshHandle: number | null = null;
 
-  constructor() {
+  constructor(private onRemove: (display: PlaceableDisplay, info: AssetInfo) => void) {
     this.panel = document.getElementById('inspector-panel')!;
     this.title = document.getElementById('inspector-title')!;
     this.sourceEl = document.getElementById('inspector-source')!;
@@ -55,11 +56,13 @@ export class Inspector {
     this.framesRow = document.getElementById('inspector-frames-row')!;
     this.framesList = document.getElementById('inspector-frames-list')!;
     this.closeBtn = document.getElementById('inspector-close')!;
+    this.removeBtn = document.getElementById('inspector-remove') as HTMLButtonElement;
 
     this.closeBtn.addEventListener('click', () => this.hide());
     this.select.addEventListener('change', () => this.onSelectFrame());
     this.playToggle.addEventListener('click', () => this.onTogglePlay());
     this.speedInput.addEventListener('input', () => this.onSpeedChange());
+    this.removeBtn.addEventListener('click', () => this.onRemoveClick());
 
     makeDraggable(this.panel, document.getElementById('inspector-header')!);
   }
@@ -207,6 +210,13 @@ export class Inspector {
     const speed = parseFloat(this.speedInput.value);
     anim.animationSpeed = speed;
     this.speedValue.textContent = `${speed.toFixed(2)}x`;
+  }
+
+  private onRemoveClick(): void {
+    if (!this.current) return;
+    const { display, info } = this.current;
+    this.hide();
+    this.onRemove(display, info);
   }
 
   private onToggleFrameInAnimation(changed: HTMLInputElement): void {

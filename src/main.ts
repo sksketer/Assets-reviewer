@@ -28,18 +28,40 @@ async function main() {
   const btnSprite = document.getElementById('btn-add-sprite')!;
   const btnAnimation = document.getElementById('btn-add-animation')!;
   const btnBitmapText = document.getElementById('btn-add-bitmaptext')!;
+  const btnRestore = document.getElementById('btn-restore') as HTMLButtonElement;
   const btnClear = document.getElementById('btn-clear')!;
 
   const modal = new Modal();
-  const inspector = new Inspector();
   const animConfigDialog = new AnimationConfigDialog();
   const spriteFrameDialog = new SpriteFrameDialog();
   const bitmapTextConfigDialog = new BitmapTextConfigDialog();
   const app = await createPixiApp(container);
-  const registerInteractive = setupSpriteInteractions(app, inspector);
 
   let currentMode: AssetMode | null = null;
   let placedCount = 0;
+
+  // Cache of removed-but-not-destroyed items, so an accidental removal can be undone
+  // without re-picking files, while loading new assets keeps working as normal.
+  interface RemovedEntry {
+    display: PlaceableDisplay;
+    info: AssetInfo;
+    x: number;
+    y: number;
+  }
+  const removedStack: RemovedEntry[] = [];
+
+  function updateRestoreButton(): void {
+    btnRestore.disabled = removedStack.length === 0;
+    btnRestore.textContent = removedStack.length > 0 ? `↺ Restore Removed (${removedStack.length})` : '↺ Restore Removed';
+  }
+
+  const inspector = new Inspector((display, info) => {
+    app.stage.removeChild(display);
+    removedStack.push({ display, info, x: display.x, y: display.y });
+    updateRestoreButton();
+    setStatus(`Removed "${info.label}" from the stage. Use "Restore Removed" to undo, or keep loading new assets as usual.`);
+  });
+  const registerInteractive = setupSpriteInteractions(app, inspector);
 
   function setStatus(message: string): void {
     statusMessage.textContent = message;
@@ -196,9 +218,21 @@ async function main() {
     await processFiles('bitmapText', files);
   });
 
+  btnRestore.addEventListener('click', () => {
+    const entry = removedStack.pop();
+    if (!entry) return;
+    entry.display.x = entry.x;
+    entry.display.y = entry.y;
+    app.stage.addChild(entry.display);
+    updateRestoreButton();
+    setStatus(`Restored "${entry.info.label}".`);
+  });
+
   btnClear.addEventListener('click', () => {
     app.stage.removeChildren();
     placedCount = 0;
+    removedStack.length = 0;
+    updateRestoreButton();
     dropHint.classList.remove('hidden');
     inspector.hide();
     setStatus('Stage cleared.');
@@ -236,6 +270,7 @@ async function main() {
     await processFiles(currentMode, files);
   });
 
+  updateRestoreButton();
   setStatus('Select "+ Sprite", "+ Animation" or "+ Bitmap Text" to load assets.');
 }
 

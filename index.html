@@ -14,6 +14,7 @@
         <button id="btn-add-sprite" type="button" class="toolbar-btn">+ Sprite</button>
         <button id="btn-add-animation" type="button" class="toolbar-btn">+ Animation</button>
         <button id="btn-add-bitmaptext" type="button" class="toolbar-btn">+ Bitmap Text</button>
+        <button id="btn-restore" type="button" class="toolbar-btn toolbar-btn--ghost" disabled>↺ Restore Removed</button>
         <button id="btn-clear" type="button" class="toolbar-btn toolbar-btn--ghost">Clear Stage</button>
       </div>
     </header>
@@ -187,6 +188,9 @@
       <div id="inspector-frames-row" class="inspector-select-row hidden">
         <span class="inspector-label">Frames in animation</span>
         <div id="inspector-frames-list" class="inspector-frames-list"></div>
+      </div>
+      <div class="inspector-actions">
+        <button id="inspector-remove" type="button" class="toolbar-btn inspector-remove-btn">Remove from Stage</button>
       </div>
     </div>
   </div>
