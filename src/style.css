@@ -123,11 +123,26 @@ body {
 
 #status-bar {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
   padding: 0.4rem 1rem;
   font-size: 0.8rem;
   color: var(--text-muted);
   background: var(--panel);
   border-top: 1px solid var(--panel-border);
+}
+
+#status-message {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-copyright {
+  flex-shrink: 0;
+  opacity: 0.75;
 }
 
 .modal-overlay {

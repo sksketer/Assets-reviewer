@@ -22,7 +22,7 @@ const ASSET_ACCEPT = `${IMAGE_ACCEPT},application/json,.json`;
 async function main() {
   const container = document.getElementById('canvas-container')!;
   const dropHint = document.getElementById('drop-hint')!;
-  const statusBar = document.getElementById('status-bar')!;
+  const statusMessage = document.getElementById('status-message')!;
   const btnSprite = document.getElementById('btn-add-sprite')!;
   const btnAnimation = document.getElementById('btn-add-animation')!;
   const btnClear = document.getElementById('btn-clear')!;
@@ -38,7 +38,7 @@ async function main() {
   let placedCount = 0;
 
   function setStatus(message: string): void {
-    statusBar.textContent = message;
+    statusMessage.textContent = message;
   }
 
   function setMode(mode: AssetMode): void {
