@@ -6,6 +6,10 @@ export function makeDraggable(panel: HTMLElement, handle: HTMLElement): void {
   let startTop = 0;
 
   handle.addEventListener('pointerdown', (e) => {
+    // Don't start a drag (and don't steal pointer capture) when the press lands on an
+    // interactive control inside the header, e.g. the close button — let it handle its own click.
+    if ((e.target as HTMLElement).closest('button, input, select, textarea, a')) return;
+
     dragging = true;
     startX = e.clientX;
     startY = e.clientY;
