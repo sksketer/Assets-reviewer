@@ -16,8 +16,13 @@ export class Inspector {
   private frameEl: HTMLElement;
   private playbackRow: HTMLElement;
   private playToggle: HTMLButtonElement;
+  private speedRow: HTMLElement;
+  private speedInput: HTMLInputElement;
+  private speedValue: HTMLElement;
   private selectRow: HTMLElement;
   private select: HTMLSelectElement;
+  private framesRow: HTMLElement;
+  private framesList: HTMLElement;
   private closeBtn: HTMLElement;
 
   private current: { display: Sprite | AnimatedSprite; info: AssetInfo } | null = null;
@@ -34,13 +39,19 @@ export class Inspector {
     this.frameEl = document.getElementById('inspector-frame')!;
     this.playbackRow = document.getElementById('inspector-playback-row')!;
     this.playToggle = document.getElementById('inspector-play-toggle') as HTMLButtonElement;
+    this.speedRow = document.getElementById('inspector-speed-row')!;
+    this.speedInput = document.getElementById('inspector-speed') as HTMLInputElement;
+    this.speedValue = document.getElementById('inspector-speed-value')!;
     this.selectRow = document.getElementById('inspector-frame-select-row')!;
     this.select = document.getElementById('inspector-frame-select') as HTMLSelectElement;
+    this.framesRow = document.getElementById('inspector-frames-row')!;
+    this.framesList = document.getElementById('inspector-frames-list')!;
     this.closeBtn = document.getElementById('inspector-close')!;
 
     this.closeBtn.addEventListener('click', () => this.hide());
     this.select.addEventListener('change', () => this.onSelectFrame());
     this.playToggle.addEventListener('click', () => this.onTogglePlay());
+    this.speedInput.addEventListener('input', () => this.onSpeedChange());
 
     makeDraggable(this.panel, document.getElementById('inspector-header')!);
   }
@@ -69,11 +80,12 @@ export class Inspector {
 
   private renderStatic(): void {
     if (!this.current) return;
-    const { info } = this.current;
+    const { display, info } = this.current;
+    const isAnimated = info.kind === 'animated';
 
     this.title.textContent = info.label;
     this.sourceEl.textContent = info.label;
-    this.typeEl.textContent = info.kind === 'animated' ? 'Animated Sprite' : 'Sprite';
+    this.typeEl.textContent = isAnimated ? 'Animated Sprite' : 'Sprite';
     this.fileSizeEl.textContent = formatBytes(info.fileSizeBytes);
     this.dimensionsEl.textContent = info.dimensionsLabel;
     this.gpuEl.textContent = formatBytes(info.gpuMemoryBytes);
@@ -86,9 +98,43 @@ export class Inspector {
       this.select.appendChild(opt);
     }
     this.selectRow.classList.toggle('hidden', info.frames.length <= 1);
-    this.playbackRow.classList.toggle('hidden', info.kind !== 'animated');
+    this.playbackRow.classList.toggle('hidden', !isAnimated);
+    this.speedRow.classList.toggle('hidden', !isAnimated);
+    this.framesRow.classList.toggle('hidden', !isAnimated || info.frames.length <= 1);
+
+    if (isAnimated) {
+      const anim = display as AnimatedSprite;
+      this.speedInput.value = String(anim.animationSpeed);
+      this.speedValue.textContent = `${anim.animationSpeed.toFixed(2)}x`;
+      this.renderFramesChecklist();
+    }
 
     this.updateDynamic();
+  }
+
+  private renderFramesChecklist(): void {
+    if (!this.current) return;
+    const { info } = this.current;
+    const activeNames = new Set(info.playbackFrameNames ?? []);
+
+    this.framesList.innerHTML = '';
+    for (const frame of info.frames) {
+      const label = document.createElement('label');
+      label.className = 'inspector-frame-check';
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.value = frame.name;
+      checkbox.checked = activeNames.has(frame.name);
+      checkbox.addEventListener('change', () => this.onToggleFrameInAnimation(checkbox));
+
+      const nameEl = document.createElement('span');
+      nameEl.textContent = frame.name;
+
+      label.appendChild(checkbox);
+      label.appendChild(nameEl);
+      this.framesList.appendChild(label);
+    }
   }
 
   private updateDynamic(): void {
@@ -141,6 +187,43 @@ export class Inspector {
     const anim = this.current.display as AnimatedSprite;
     if (anim.playing) anim.stop();
     else anim.play();
+    this.updateDynamic();
+  }
+
+  private onSpeedChange(): void {
+    if (!this.current || this.current.info.kind !== 'animated') return;
+    const anim = this.current.display as AnimatedSprite;
+    const speed = parseFloat(this.speedInput.value);
+    anim.animationSpeed = speed;
+    this.speedValue.textContent = `${speed.toFixed(2)}x`;
+  }
+
+  private onToggleFrameInAnimation(changed: HTMLInputElement): void {
+    if (!this.current || this.current.info.kind !== 'animated') return;
+    const { display, info } = this.current;
+    const anim = display as AnimatedSprite;
+
+    const checkboxes = [...this.framesList.querySelectorAll<HTMLInputElement>('input[type=checkbox]')];
+    const checkedNames = new Set(checkboxes.filter((c) => c.checked).map((c) => c.value));
+
+    if (checkedNames.size === 0) {
+      // Keep at least one frame in the animation; revert the box that was just unchecked.
+      changed.checked = true;
+      return;
+    }
+
+    const orderedNames = info.frames.map((f) => f.name).filter((name) => checkedNames.has(name));
+    const textureByName = new Map(info.frames.map((f) => [f.name, f.texture]));
+    const newTextures = orderedNames.map((name) => textureByName.get(name)!);
+
+    const wasPlaying = anim.playing;
+    const speed = anim.animationSpeed;
+    anim.textures = newTextures; // resets to frame 0 and stops, per Pixi's AnimatedSprite.textures setter
+    anim.animationSpeed = speed;
+    info.playbackFrameNames = orderedNames;
+    info.currentFrame = orderedNames[0];
+    if (wasPlaying) anim.play();
+
     this.updateDynamic();
   }
 }

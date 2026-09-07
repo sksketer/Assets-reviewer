@@ -66,9 +66,20 @@
         <span class="inspector-label">Playback</span>
         <button id="inspector-play-toggle" type="button" class="toolbar-btn toolbar-btn--ghost inspector-play-btn">Pause</button>
       </div>
+      <div id="inspector-speed-row" class="inspector-row hidden">
+        <label for="inspector-speed" class="inspector-label">Speed</label>
+        <div class="inspector-speed-control">
+          <input id="inspector-speed" type="range" min="0.01" max="1" step="0.01" />
+          <span id="inspector-speed-value" class="inspector-speed-value"></span>
+        </div>
+      </div>
       <div id="inspector-frame-select-row" class="inspector-select-row hidden">
-        <label for="inspector-frame-select" class="inspector-label">Change frame texture</label>
+        <label for="inspector-frame-select" class="inspector-label">Jump to frame</label>
         <select id="inspector-frame-select" class="inspector-select"></select>
+      </div>
+      <div id="inspector-frames-row" class="inspector-select-row hidden">
+        <span class="inspector-label">Frames in animation</span>
+        <div id="inspector-frames-list" class="inspector-frames-list"></div>
       </div>
     </div>
   </div>
