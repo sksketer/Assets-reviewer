@@ -28,6 +28,26 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/**
+ * TexturePacker (and some other tools) can export spritesheet JSON with `frames` as an ARRAY of
+ * `{ filename, frame, ... }` entries instead of the dictionary keyed by frame name that Pixi's
+ * `Spritesheet` class (and our own validation) expects. Convert the array form to the dictionary
+ * form here so both shapes load correctly.
+ */
+function normalizeSpritesheetJson(json: unknown): unknown {
+  if (!isPlainObject(json) || !Array.isArray(json.frames)) return json;
+
+  const frames: Record<string, unknown> = {};
+  for (const entry of json.frames) {
+    if (!isPlainObject(entry)) continue;
+    const filename = entry.filename ?? entry.name;
+    if (typeof filename !== 'string') continue;
+    const { filename: _filename, name: _name, ...rest } = entry;
+    frames[filename] = rest;
+  }
+  return { ...json, frames };
+}
+
 function validateSpritesheetJsonShape(json: unknown): string | null {
   if (!isPlainObject(json)) {
     return 'The spritesheet JSON must be an object with a "frames" section.';
@@ -57,9 +77,10 @@ async function parseSpritesheetJsonFile(file: File): Promise<{ json: unknown } |
     return { error: `"${file.name}" is not valid JSON. Please provide the spritesheet JSON exported alongside the PNG.` };
   }
 
-  const shapeError = validateSpritesheetJsonShape(parsed);
+  const normalized = normalizeSpritesheetJson(parsed);
+  const shapeError = validateSpritesheetJsonShape(normalized);
   if (shapeError) return { error: shapeError };
-  return { json: parsed };
+  return { json: normalized };
 }
 
 function baseName(name: string): string {
