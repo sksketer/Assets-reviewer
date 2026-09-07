@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sprite Assets Viewer</title>
+  <script type="module" crossorigin src="./assets/index-DKNIICGN.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BCpB5gml.css">
+</head>
+<body>
+  <div id="app">
+    <header id="toolbar">
+      <div class="toolbar-brand">Sprite Assets Viewer</div>
+      <div class="toolbar-actions">
+        <button id="btn-add-sprite" type="button" class="toolbar-btn">+ Sprite</button>
+        <button id="btn-add-animation" type="button" class="toolbar-btn">+ Animation</button>
+        <button id="btn-add-bitmaptext" type="button" class="toolbar-btn">+ Bitmap Text</button>
+        <button id="btn-restore" type="button" class="toolbar-btn toolbar-btn--ghost" disabled>↺ Restore Removed</button>
+        <button id="btn-clear" type="button" class="toolbar-btn toolbar-btn--ghost">Clear Stage</button>
+      </div>
+    </header>
+
+    <main id="canvas-container">
+      <div id="drop-hint">Select "+ Sprite", "+ Animation" or "+ Bitmap Text", then choose files or drag &amp; drop them here.</div>
+    </main>
+
+    <footer id="status-bar">
+      <span id="status-message">Ready.</span>
+      <span class="status-copyright">© sketeramrit</span>
+    </footer>
+  </div>
+
+  <div id="modal-overlay" class="modal-overlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <h2 id="modal-title">Invalid Assets</h2>
+      <p id="modal-message"></p>
+      <button id="modal-close" type="button" class="toolbar-btn">Close</button>
+    </div>
+  </div>
+
+  <div id="anim-config-overlay" class="modal-overlay">
+    <div class="modal anim-config-modal" role="dialog" aria-modal="true" aria-labelledby="anim-config-title">
+      <h2 id="anim-config-title">Configure Animation</h2>
+      <div class="anim-config-body">
+        <div class="inspector-row">
+          <label for="anim-config-speed" class="inspector-label">Speed</label>
+          <div class="inspector-speed-control">
+            <input id="anim-config-speed" type="range" min="0.01" max="1" step="0.01" value="0.15" />
+            <span id="anim-config-speed-value" class="inspector-speed-value">0.15x</span>
+          </div>
+        </div>
+        <div class="inspector-select-row">
+          <label for="anim-config-default-frame" class="inspector-label">Default frame (shown when stopped)</label>
+          <select id="anim-config-default-frame" class="inspector-select"></select>
+        </div>
+        <div class="inspector-select-row">
+          <span class="inspector-label">Frames to include in the animation loop</span>
+          <div id="anim-config-frames" class="inspector-frames-list anim-config-frames-list"></div>
+        </div>
+      </div>
+      <div class="anim-config-actions">
+        <button id="anim-config-cancel" type="button" class="toolbar-btn toolbar-btn--ghost">Cancel</button>
+        <button id="anim-config-confirm" type="button" class="toolbar-btn">Create Animation</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="sprite-frame-overlay" class="modal-overlay">
+    <div class="modal anim-config-modal" role="dialog" aria-modal="true" aria-labelledby="sprite-frame-title">
+      <h2 id="sprite-frame-title">Choose Sprite Frame</h2>
+      <div class="anim-config-body">
+        <div class="inspector-select-row">
+          <span class="inspector-label">Select the frame to display</span>
+          <div id="sprite-frame-list" class="inspector-frames-list anim-config-frames-list"></div>
+        </div>
+      </div>
+      <div class="anim-config-actions">
+        <button id="sprite-frame-cancel" type="button" class="toolbar-btn toolbar-btn--ghost">Cancel</button>
+        <button id="sprite-frame-confirm" type="button" class="toolbar-btn">Create Sprite</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="bitmaptext-config-overlay" class="modal-overlay">
+    <div class="modal anim-config-modal" role="dialog" aria-modal="true" aria-labelledby="bitmaptext-config-title">
+      <h2 id="bitmaptext-config-title">Configure Bitmap Text</h2>
+      <div class="anim-config-body">
+        <div class="inspector-row">
+          <span class="inspector-label">Font family</span>
+          <span id="bitmaptext-font-family" class="inspector-value"></span>
+        </div>
+        <div class="inspector-select-row">
+          <label for="bitmaptext-text" class="inspector-label">Text</label>
+          <textarea id="bitmaptext-text" class="inspector-select bitmaptext-textarea" rows="3"></textarea>
+        </div>
+        <div class="inspector-row">
+          <label for="bitmaptext-fontsize" class="inspector-label">Font size</label>
+          <input id="bitmaptext-fontsize" type="number" min="1" step="1" class="bitmaptext-number" />
+        </div>
+        <div class="inspector-row">
+          <label for="bitmaptext-fill" class="inspector-label">Fill color</label>
+          <input id="bitmaptext-fill" type="color" class="bitmaptext-color" value="#ffffff" />
+        </div>
+        <div class="inspector-row">
+          <label for="bitmaptext-align" class="inspector-label">Align</label>
+          <select id="bitmaptext-align" class="inspector-select bitmaptext-inline-select">
+            <option value="left">Left</option>
+            <option value="center">Center</option>
+            <option value="right">Right</option>
+            <option value="justify">Justify</option>
+          </select>
+        </div>
+        <div class="inspector-row">
+          <label for="bitmaptext-letterspacing" class="inspector-label">Letter spacing</label>
+          <input id="bitmaptext-letterspacing" type="number" step="0.5" class="bitmaptext-number" value="0" />
+        </div>
+        <div class="inspector-row">
+          <label for="bitmaptext-wordwrap" class="inspector-label">Word wrap</label>
+          <input id="bitmaptext-wordwrap" type="checkbox" />
+        </div>
+        <div id="bitmaptext-wordwrapwidth-row" class="inspector-row hidden">
+          <label for="bitmaptext-wordwrapwidth" class="inspector-label">Word wrap width</label>
+          <input id="bitmaptext-wordwrapwidth" type="number" min="10" step="10" class="bitmaptext-number" value="200" />
+        </div>
+        <div class="inspector-row">
+          <span class="inspector-label">Anchor (x / y)</span>
+          <div class="bitmaptext-anchor-control">
+            <input id="bitmaptext-anchorx" type="number" min="0" max="1" step="0.1" value="0.5" class="bitmaptext-number bitmaptext-number--small" />
+            <input id="bitmaptext-anchory" type="number" min="0" max="1" step="0.1" value="0.5" class="bitmaptext-number bitmaptext-number--small" />
+          </div>
+        </div>
+        <div class="inspector-row">
+          <label for="bitmaptext-roundpixels" class="inspector-label">Round pixels</label>
+          <input id="bitmaptext-roundpixels" type="checkbox" />
+        </div>
+      </div>
+      <div class="anim-config-actions">
+        <button id="bitmaptext-config-cancel" type="button" class="toolbar-btn toolbar-btn--ghost">Cancel</button>
+        <button id="bitmaptext-config-confirm" type="button" class="toolbar-btn">Create Text</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="inspector-panel" class="inspector-panel hidden">
+    <div id="inspector-header" class="inspector-header">
+      <span id="inspector-title" class="inspector-title">Sprite</span>
+      <button id="inspector-close" type="button" class="inspector-close" aria-label="Close panel">&times;</button>
+    </div>
+    <div class="inspector-body">
+      <div class="inspector-row">
+        <span class="inspector-label">Source</span>
+        <span id="inspector-source" class="inspector-value"></span>
+      </div>
+      <div class="inspector-row">
+        <span class="inspector-label">Type</span>
+        <span id="inspector-type" class="inspector-value"></span>
+      </div>
+      <div class="inspector-row">
+        <span class="inspector-label">File size</span>
+        <span id="inspector-filesize" class="inspector-value"></span>
+      </div>
+      <div class="inspector-row">
+        <span class="inspector-label">Dimensions</span>
+        <span id="inspector-dimensions" class="inspector-value"></span>
+      </div>
+      <div class="inspector-row">
+        <span class="inspector-label">GPU memory (est.)</span>
+        <span id="inspector-gpu" class="inspector-value"></span>
+      </div>
+      <div class="inspector-row">
+        <span id="inspector-frame-label" class="inspector-label">Current frame</span>
+        <span id="inspector-frame" class="inspector-value"></span>
+      </div>
+      <div id="inspector-playback-row" class="inspector-row hidden">
+        <span class="inspector-label">Playback</span>
+        <button id="inspector-play-toggle" type="button" class="toolbar-btn toolbar-btn--ghost inspector-play-btn">Pause</button>
+      </div>
+      <div id="inspector-speed-row" class="inspector-row hidden">
+        <label for="inspector-speed" class="inspector-label">Speed</label>
+        <div class="inspector-speed-control">
+          <input id="inspector-speed" type="range" min="0.01" max="1" step="0.01" />
+          <span id="inspector-speed-value" class="inspector-speed-value"></span>
+        </div>
+      </div>
+      <div id="inspector-frame-select-row" class="inspector-select-row hidden">
+        <label for="inspector-frame-select" class="inspector-label">Jump to frame</label>
+        <select id="inspector-frame-select" class="inspector-select"></select>
+      </div>
+      <div id="inspector-frames-row" class="inspector-select-row hidden">
+        <span class="inspector-label">Frames in animation</span>
+        <div id="inspector-frames-list" class="inspector-frames-list"></div>
+      </div>
+      <div class="inspector-actions">
+        <button id="inspector-remove" type="button" class="toolbar-btn inspector-remove-btn">Remove from Stage</button>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
