@@ -1,5 +1,6 @@
 import type { Sprite, AnimatedSprite } from 'pixi.js';
 import { createPixiApp } from './pixi/app';
+import { setupSpriteInteractions } from './pixi/interactions';
 import { pickFiles } from './ui/fileInput';
 import { Modal } from './ui/modal';
 import { Inspector } from './ui/inspector';
@@ -31,6 +32,7 @@ async function main() {
   const animConfigDialog = new AnimationConfigDialog();
   const spriteFrameDialog = new SpriteFrameDialog();
   const app = await createPixiApp(container);
+  const registerInteractive = setupSpriteInteractions(app, inspector);
 
   let currentMode: AssetMode | null = null;
   let placedCount = 0;
@@ -59,9 +61,7 @@ async function main() {
 
     display.x = app.screen.width / 2 + offsetX;
     display.y = app.screen.height / 2 + offsetY;
-    display.eventMode = 'static';
-    display.cursor = 'pointer';
-    display.on('pointertap', () => inspector.show(display, info));
+    registerInteractive(display, info);
 
     app.stage.addChild(display);
     placedCount += 1;
@@ -165,6 +165,15 @@ async function main() {
     inspector.hide();
     setStatus('Stage cleared.');
   });
+
+  // Prevent ctrl+wheel/pinch over the canvas from zooming the whole page — sprites handle it themselves.
+  container.addEventListener(
+    'wheel',
+    (e) => {
+      if (e.ctrlKey) e.preventDefault();
+    },
+    { passive: false },
+  );
 
   container.addEventListener('dragover', (e) => {
     e.preventDefault();
