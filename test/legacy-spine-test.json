@@ -1,5 +1,5 @@
 {
-  "skeleton": { "hash": "test", "spine": "3.8.75", "width": 64, "height": 64, "images": "", "audio": "" },
+  "skeleton": { "hash": "test", "spine": "3.8.99", "width": 64, "height": 64, "images": "", "audio": "" },
   "bones": [
     { "name": "root" }
   ],
@@ -17,6 +17,17 @@
     }
   ],
   "animations": {
-    "idle": {}
+    "idle": {},
+    "wave": {
+      "bones": {
+        "root": {
+          "rotate": [
+            { "time": 0, "angle": 0 },
+            { "time": 0.5, "angle": 30 },
+            { "time": 1, "angle": 0 }
+          ]
+        }
+      }
+    }
   }
 }

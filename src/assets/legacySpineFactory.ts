@@ -8,6 +8,7 @@ import * as spine41 from '@pixi-spine/runtime-4.1';
 import { Spine } from 'pixi-spine';
 import { Sprite, Texture, Ticker } from 'pixi.js';
 import { loadImageFile } from './loadImage';
+import { registerSpineControl, type SpineControlHandle } from './spineControl';
 import type { AssetInfo } from './types';
 import type { SpineConfig } from './spineFactory';
 
@@ -184,6 +185,46 @@ export async function loadLegacySpineAsset(
   };
 }
 
+/** Builds the Inspector's live playback control surface for a legacy (Pixi v7) pixi-spine object. */
+function createLegacySpineControlHandle(spine: Spine, initialAnimationName: string | null, initialLoop: boolean): SpineControlHandle {
+  let animationName = initialAnimationName;
+  let loop = initialLoop;
+  let speed = 1;
+
+  return {
+    runtimeLabel: 'Spine < 4.0 (pixi-spine, legacy runtime)',
+    spineVersion: spine.spineData.version || 'unknown',
+    animationNames: spine.spineData.animations.map((a) => a.name),
+    getAnimationName: () => animationName,
+    setAnimation: (name) => {
+      animationName = name;
+      if (!name) {
+        spine.state.clearTrack(0);
+        spine.skeleton.setToSetupPose();
+        return;
+      }
+      const entry = spine.state.setAnimation(0, name, loop);
+      entry.timeScale = speed;
+    },
+    getLoop: () => loop,
+    setLoop: (value) => {
+      loop = value;
+      const entry = spine.state.tracks[0];
+      if (entry) entry.loop = value;
+    },
+    getSpeed: () => speed,
+    setSpeed: (value) => {
+      speed = value;
+      const entry = spine.state.tracks[0];
+      if (entry) entry.timeScale = value;
+    },
+    getPlaying: () => spine.autoUpdate,
+    setPlaying: (playing) => {
+      spine.autoUpdate = playing;
+    },
+  };
+}
+
 const CANVAS_PADDING = 4;
 const MIN_CANVAS_SIZE = 8;
 
@@ -243,6 +284,7 @@ export function createLegacySpineDisplay(loaded: LoadedLegacySpine, config: Spin
       renderer.destroy(true);
     },
   });
+  registerSpineControl(sprite, createLegacySpineControlHandle(spine, config.animationName, config.loop));
 
   const info: AssetInfo = {
     kind: 'spine',

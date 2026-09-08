@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sprite Assets Viewer</title>
+  <title>Assets Viewer</title>
   <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
   <div id="app">
     <header id="toolbar">
-      <div class="toolbar-brand">Sprite Assets Viewer</div>
+      <div class="toolbar-brand">Assets Viewer</div>
       <div class="toolbar-actions">
         <button id="btn-add-sprite" type="button" class="toolbar-btn">+ Sprite</button>
         <button id="btn-add-animation" type="button" class="toolbar-btn">+ Animation</button>
@@ -215,6 +215,14 @@
         <span id="inspector-frame-label" class="inspector-label">Current frame</span>
         <span id="inspector-frame" class="inspector-value"></span>
       </div>
+      <div id="inspector-spine-runtime-row" class="inspector-row hidden">
+        <span class="inspector-label">Runtime</span>
+        <span id="inspector-spine-runtime" class="inspector-value"></span>
+      </div>
+      <div id="inspector-spine-version-row" class="inspector-row hidden">
+        <span class="inspector-label">Spine version</span>
+        <span id="inspector-spine-version" class="inspector-value"></span>
+      </div>
       <div id="inspector-playback-row" class="inspector-row hidden">
         <span class="inspector-label">Playback</span>
         <button id="inspector-play-toggle" type="button" class="toolbar-btn toolbar-btn--ghost inspector-play-btn">Pause</button>
@@ -226,8 +234,12 @@
           <span id="inspector-speed-value" class="inspector-speed-value"></span>
         </div>
       </div>
+      <div id="inspector-spine-loop-row" class="inspector-row hidden">
+        <label for="inspector-spine-loop" class="inspector-label">Loop</label>
+        <input id="inspector-spine-loop" type="checkbox" />
+      </div>
       <div id="inspector-frame-select-row" class="inspector-select-row hidden">
-        <label for="inspector-frame-select" class="inspector-label">Jump to frame</label>
+        <label id="inspector-frame-select-label" for="inspector-frame-select" class="inspector-label">Jump to frame</label>
         <select id="inspector-frame-select" class="inspector-select"></select>
       </div>
       <div id="inspector-frames-row" class="inspector-select-row hidden">

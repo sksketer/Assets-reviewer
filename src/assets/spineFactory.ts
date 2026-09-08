@@ -2,6 +2,7 @@ import { Texture } from 'pixi.js';
 import { AtlasAttachmentLoader, SkeletonBinary, SkeletonJson, TextureAtlas, type SkeletonData } from '@esotericsoftware/spine-core';
 import { Spine, SpineTexture } from '@esotericsoftware/spine-pixi-v8';
 import { loadImageFile } from './loadImage';
+import { registerSpineControl, type SpineControlHandle } from './spineControl';
 import type { AssetInfo } from './types';
 
 export interface LoadedSpine {
@@ -98,6 +99,46 @@ export async function loadSpineAsset(
   };
 }
 
+/** Builds the Inspector's live playback control surface for a modern (Pixi v8) Spine object. */
+function createSpineControlHandle(spine: Spine, initialAnimationName: string | null, initialLoop: boolean): SpineControlHandle {
+  let animationName = initialAnimationName;
+  let loop = initialLoop;
+  let speed = 1;
+
+  return {
+    runtimeLabel: 'Spine ≥ 4.0 (Esoteric Software spine-pixi-v8)',
+    spineVersion: spine.skeleton.data.version || 'unknown',
+    animationNames: spine.skeleton.data.animations.map((a) => a.name),
+    getAnimationName: () => animationName,
+    setAnimation: (name) => {
+      animationName = name;
+      if (!name) {
+        spine.state.clearTrack(0);
+        spine.skeleton.setupPose();
+        return;
+      }
+      const entry = spine.state.setAnimation(0, name, loop);
+      entry.timeScale = speed;
+    },
+    getLoop: () => loop,
+    setLoop: (value) => {
+      loop = value;
+      const entry = spine.state.tracks[0];
+      if (entry) entry.loop = value;
+    },
+    getSpeed: () => speed,
+    setSpeed: (value) => {
+      speed = value;
+      const entry = spine.state.tracks[0];
+      if (entry) entry.timeScale = value;
+    },
+    getPlaying: () => spine.autoUpdate,
+    setPlaying: (playing) => {
+      spine.autoUpdate = playing;
+    },
+  };
+}
+
 export function createSpineDisplay(loaded: LoadedSpine, config: SpineConfig): CreatedSpine {
   const spine = new Spine({ skeletonData: loaded.skeletonData });
   spine.scale.set(config.scale);
@@ -106,6 +147,8 @@ export function createSpineDisplay(loaded: LoadedSpine, config: SpineConfig): Cr
   if (config.animationName) {
     spine.state.setAnimation(0, config.animationName, config.loop);
   }
+
+  registerSpineControl(spine, createSpineControlHandle(spine, config.animationName, config.loop));
 
   const info: AssetInfo = {
     kind: 'spine',

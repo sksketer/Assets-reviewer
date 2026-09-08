@@ -1,7 +1,10 @@
 import type { AnimatedSprite, Sprite } from 'pixi.js';
 import type { AssetInfo, PlaceableDisplay } from '../assets/types';
 import { formatBytes } from '../assets/format';
+import { getSpineControl } from '../assets/spineControl';
 import { makeDraggable } from './draggable';
+
+const SETUP_POSE_OPTION_VALUE = '';
 
 const REFRESH_INTERVAL_MS = 150;
 
@@ -22,12 +25,19 @@ export class Inspector {
   private gpuEl: HTMLElement;
   private frameLabelEl: HTMLElement;
   private frameEl: HTMLElement;
+  private spineRuntimeRow: HTMLElement;
+  private spineRuntimeEl: HTMLElement;
+  private spineVersionRow: HTMLElement;
+  private spineVersionEl: HTMLElement;
   private playbackRow: HTMLElement;
   private playToggle: HTMLButtonElement;
   private speedRow: HTMLElement;
   private speedInput: HTMLInputElement;
   private speedValue: HTMLElement;
+  private spineLoopRow: HTMLElement;
+  private spineLoopInput: HTMLInputElement;
   private selectRow: HTMLElement;
+  private selectLabel: HTMLElement;
   private select: HTMLSelectElement;
   private framesRow: HTMLElement;
   private framesList: HTMLElement;
@@ -47,12 +57,19 @@ export class Inspector {
     this.gpuEl = document.getElementById('inspector-gpu')!;
     this.frameLabelEl = document.getElementById('inspector-frame-label')!;
     this.frameEl = document.getElementById('inspector-frame')!;
+    this.spineRuntimeRow = document.getElementById('inspector-spine-runtime-row')!;
+    this.spineRuntimeEl = document.getElementById('inspector-spine-runtime')!;
+    this.spineVersionRow = document.getElementById('inspector-spine-version-row')!;
+    this.spineVersionEl = document.getElementById('inspector-spine-version')!;
     this.playbackRow = document.getElementById('inspector-playback-row')!;
     this.playToggle = document.getElementById('inspector-play-toggle') as HTMLButtonElement;
     this.speedRow = document.getElementById('inspector-speed-row')!;
     this.speedInput = document.getElementById('inspector-speed') as HTMLInputElement;
     this.speedValue = document.getElementById('inspector-speed-value')!;
+    this.spineLoopRow = document.getElementById('inspector-spine-loop-row')!;
+    this.spineLoopInput = document.getElementById('inspector-spine-loop') as HTMLInputElement;
     this.selectRow = document.getElementById('inspector-frame-select-row')!;
+    this.selectLabel = document.getElementById('inspector-frame-select-label')!;
     this.select = document.getElementById('inspector-frame-select') as HTMLSelectElement;
     this.framesRow = document.getElementById('inspector-frames-row')!;
     this.framesList = document.getElementById('inspector-frames-list')!;
@@ -63,6 +80,7 @@ export class Inspector {
     this.select.addEventListener('change', () => this.onSelectFrame());
     this.playToggle.addEventListener('click', () => this.onTogglePlay());
     this.speedInput.addEventListener('input', () => this.onSpeedChange());
+    this.spineLoopInput.addEventListener('change', () => this.onSpineLoopChange());
     this.removeBtn.addEventListener('click', () => this.onRemoveClick());
 
     makeDraggable(this.panel, document.getElementById('inspector-header')!);
@@ -94,25 +112,52 @@ export class Inspector {
     if (!this.current) return;
     const { display, info } = this.current;
     const isAnimated = info.kind === 'animated';
+    const isSpine = info.kind === 'spine';
+    const spineControl = isSpine ? getSpineControl(display) : undefined;
 
     this.title.textContent = info.label;
     this.sourceEl.textContent = info.label;
     this.typeEl.textContent = TYPE_LABELS[info.kind];
-    this.frameLabelEl.textContent = info.kind === 'text' ? 'Text' : info.kind === 'spine' ? 'Animation' : 'Current frame';
+    this.frameLabelEl.textContent = info.kind === 'text' ? 'Text' : isSpine ? 'Animation' : 'Current frame';
     this.fileSizeEl.textContent = formatBytes(info.fileSizeBytes);
     this.dimensionsEl.textContent = info.dimensionsLabel;
     this.gpuEl.textContent = formatBytes(info.gpuMemoryBytes);
 
-    this.select.innerHTML = '';
-    for (const frame of info.frames) {
-      const opt = document.createElement('option');
-      opt.value = frame.name;
-      opt.textContent = frame.name;
-      this.select.appendChild(opt);
+    this.spineRuntimeRow.classList.toggle('hidden', !spineControl);
+    this.spineVersionRow.classList.toggle('hidden', !spineControl);
+    this.spineLoopRow.classList.toggle('hidden', !spineControl);
+    if (spineControl) {
+      this.spineRuntimeEl.textContent = spineControl.runtimeLabel;
+      this.spineVersionEl.textContent = spineControl.spineVersion;
+      this.spineLoopInput.checked = spineControl.getLoop();
     }
-    this.selectRow.classList.toggle('hidden', info.frames.length <= 1);
-    this.playbackRow.classList.toggle('hidden', !isAnimated);
-    this.speedRow.classList.toggle('hidden', !isAnimated);
+
+    this.select.innerHTML = '';
+    this.selectLabel.textContent = spineControl ? 'Switch animation' : 'Jump to frame';
+    if (spineControl) {
+      const setupOpt = document.createElement('option');
+      setupOpt.value = SETUP_POSE_OPTION_VALUE;
+      setupOpt.textContent = '(Setup pose — no animation)';
+      this.select.appendChild(setupOpt);
+      for (const name of spineControl.animationNames) {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        this.select.appendChild(opt);
+      }
+      this.selectRow.classList.toggle('hidden', spineControl.animationNames.length === 0);
+    } else {
+      for (const frame of info.frames) {
+        const opt = document.createElement('option');
+        opt.value = frame.name;
+        opt.textContent = frame.name;
+        this.select.appendChild(opt);
+      }
+      this.selectRow.classList.toggle('hidden', info.frames.length <= 1);
+    }
+
+    this.playbackRow.classList.toggle('hidden', !isAnimated && !spineControl);
+    this.speedRow.classList.toggle('hidden', !isAnimated && !spineControl);
     this.framesRow.classList.toggle('hidden', !isAnimated || info.frames.length <= 1);
 
     if (isAnimated) {
@@ -120,6 +165,9 @@ export class Inspector {
       this.speedInput.value = String(anim.animationSpeed);
       this.speedValue.textContent = `${anim.animationSpeed.toFixed(2)}x`;
       this.renderFramesChecklist();
+    } else if (spineControl) {
+      this.speedInput.value = String(spineControl.getSpeed());
+      this.speedValue.textContent = `${spineControl.getSpeed().toFixed(2)}x`;
     }
 
     this.updateDynamic();
@@ -160,6 +208,20 @@ export class Inspector {
         info.currentFrame = info.playbackFrameNames[anim.currentFrame] ?? info.currentFrame;
       }
       this.playToggle.textContent = anim.playing ? 'Pause' : 'Play';
+      this.frameEl.textContent = info.currentFrame;
+      if (info.frames.some((f) => f.name === info.currentFrame)) {
+        this.select.value = info.currentFrame;
+      }
+      return;
+    }
+
+    const spineControl = info.kind === 'spine' ? getSpineControl(display) : undefined;
+    if (spineControl) {
+      this.playToggle.textContent = spineControl.getPlaying() ? 'Pause' : 'Play';
+      const animationName = spineControl.getAnimationName();
+      this.frameEl.textContent = animationName ?? 'Setup pose';
+      this.select.value = animationName ?? SETUP_POSE_OPTION_VALUE;
+      return;
     }
 
     this.frameEl.textContent = info.currentFrame;
@@ -183,6 +245,14 @@ export class Inspector {
   private onSelectFrame(): void {
     if (!this.current) return;
     const { display, info } = this.current;
+
+    if (info.kind === 'spine') {
+      const control = getSpineControl(display);
+      control?.setAnimation(this.select.value || null);
+      this.updateDynamic();
+      return;
+    }
+
     const name = this.select.value;
     const frame = info.frames.find((f) => f.name === name);
     if (!frame) return;
@@ -198,19 +268,44 @@ export class Inspector {
   }
 
   private onTogglePlay(): void {
-    if (!this.current || this.current.info.kind !== 'animated') return;
-    const anim = this.current.display as AnimatedSprite;
-    if (anim.playing) anim.stop();
-    else anim.play();
+    if (!this.current) return;
+    const { display, info } = this.current;
+
+    if (info.kind === 'animated') {
+      const anim = display as AnimatedSprite;
+      if (anim.playing) anim.stop();
+      else anim.play();
+    } else if (info.kind === 'spine') {
+      const control = getSpineControl(display);
+      if (!control) return;
+      control.setPlaying(!control.getPlaying());
+    } else {
+      return;
+    }
     this.updateDynamic();
   }
 
   private onSpeedChange(): void {
-    if (!this.current || this.current.info.kind !== 'animated') return;
-    const anim = this.current.display as AnimatedSprite;
+    if (!this.current) return;
+    const { display, info } = this.current;
     const speed = parseFloat(this.speedInput.value);
-    anim.animationSpeed = speed;
+
+    if (info.kind === 'animated') {
+      (display as AnimatedSprite).animationSpeed = speed;
+    } else if (info.kind === 'spine') {
+      const control = getSpineControl(display);
+      if (!control) return;
+      control.setSpeed(speed);
+    } else {
+      return;
+    }
     this.speedValue.textContent = `${speed.toFixed(2)}x`;
+  }
+
+  private onSpineLoopChange(): void {
+    if (!this.current || this.current.info.kind !== 'spine') return;
+    const control = getSpineControl(this.current.display);
+    control?.setLoop(this.spineLoopInput.checked);
   }
 
   private onRemoveClick(): void {
