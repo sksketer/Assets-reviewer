@@ -3,25 +3,26 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sprite Assets Viewer</title>
-  <script type="module" crossorigin src="./assets/index-DKNIICGN.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-BCpB5gml.css">
+  <title>Assets Viewer</title>
+  <script type="module" crossorigin src="./assets/index-BI0BdCki.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-C-SESlVw.css">
 </head>
 <body>
   <div id="app">
     <header id="toolbar">
-      <div class="toolbar-brand">Sprite Assets Viewer</div>
+      <div class="toolbar-brand">Assets Viewer</div>
       <div class="toolbar-actions">
         <button id="btn-add-sprite" type="button" class="toolbar-btn">+ Sprite</button>
         <button id="btn-add-animation" type="button" class="toolbar-btn">+ Animation</button>
         <button id="btn-add-bitmaptext" type="button" class="toolbar-btn">+ Bitmap Text</button>
+        <button id="btn-add-spine" type="button" class="toolbar-btn">+ Spine</button>
         <button id="btn-restore" type="button" class="toolbar-btn toolbar-btn--ghost" disabled>↺ Restore Removed</button>
         <button id="btn-clear" type="button" class="toolbar-btn toolbar-btn--ghost">Clear Stage</button>
       </div>
     </header>
 
     <main id="canvas-container">
-      <div id="drop-hint">Select "+ Sprite", "+ Animation" or "+ Bitmap Text", then choose files or drag &amp; drop them here.</div>
+      <div id="drop-hint">Select "+ Sprite", "+ Animation", "+ Bitmap Text" or "+ Spine", then choose files or drag &amp; drop them here.</div>
     </main>
 
     <footer id="status-bar">
@@ -141,6 +142,50 @@
     </div>
   </div>
 
+  <div id="spine-runtime-overlay" class="modal-overlay">
+    <div class="modal anim-config-modal" role="dialog" aria-modal="true" aria-labelledby="spine-runtime-title">
+      <h2 id="spine-runtime-title">Choose Spine Runtime</h2>
+      <p class="spine-runtime-desc">Pick the runtime that matches the Spine editor version your assets were exported with.</p>
+      <div class="spine-runtime-choices">
+        <button id="spine-runtime-legacy" type="button" class="toolbar-btn toolbar-btn--ghost spine-runtime-btn">
+          <strong>Spine &lt; 4.0</strong>
+          <span>Legacy runtime (pixi-spine, rendered on an offscreen canvas)</span>
+        </button>
+        <button id="spine-runtime-modern" type="button" class="toolbar-btn spine-runtime-btn">
+          <strong>Spine ≥ 4.0</strong>
+          <span>Latest Esoteric Software runtime</span>
+        </button>
+      </div>
+      <div class="anim-config-actions">
+        <button id="spine-runtime-cancel" type="button" class="toolbar-btn toolbar-btn--ghost">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="spine-config-overlay" class="modal-overlay">
+    <div class="modal anim-config-modal" role="dialog" aria-modal="true" aria-labelledby="spine-config-title">
+      <h2 id="spine-config-title">Configure Spine</h2>
+      <div class="anim-config-body">
+        <div class="inspector-select-row">
+          <label for="spine-config-animation" class="inspector-label">Animation</label>
+          <select id="spine-config-animation" class="inspector-select"></select>
+        </div>
+        <div class="inspector-row">
+          <label for="spine-config-loop" class="inspector-label">Loop</label>
+          <input id="spine-config-loop" type="checkbox" />
+        </div>
+        <div class="inspector-row">
+          <label for="spine-config-scale" class="inspector-label">Scale</label>
+          <input id="spine-config-scale" type="number" min="0.01" step="0.1" value="1" class="bitmaptext-number" />
+        </div>
+      </div>
+      <div class="anim-config-actions">
+        <button id="spine-config-cancel" type="button" class="toolbar-btn toolbar-btn--ghost">Cancel</button>
+        <button id="spine-config-confirm" type="button" class="toolbar-btn">Create Spine</button>
+      </div>
+    </div>
+  </div>
+
   <div id="inspector-panel" class="inspector-panel hidden">
     <div id="inspector-header" class="inspector-header">
       <span id="inspector-title" class="inspector-title">Sprite</span>
@@ -171,6 +216,14 @@
         <span id="inspector-frame-label" class="inspector-label">Current frame</span>
         <span id="inspector-frame" class="inspector-value"></span>
       </div>
+      <div id="inspector-spine-runtime-row" class="inspector-row hidden">
+        <span class="inspector-label">Runtime</span>
+        <span id="inspector-spine-runtime" class="inspector-value"></span>
+      </div>
+      <div id="inspector-spine-version-row" class="inspector-row hidden">
+        <span class="inspector-label">Spine version</span>
+        <span id="inspector-spine-version" class="inspector-value"></span>
+      </div>
       <div id="inspector-playback-row" class="inspector-row hidden">
         <span class="inspector-label">Playback</span>
         <button id="inspector-play-toggle" type="button" class="toolbar-btn toolbar-btn--ghost inspector-play-btn">Pause</button>
@@ -182,8 +235,12 @@
           <span id="inspector-speed-value" class="inspector-speed-value"></span>
         </div>
       </div>
+      <div id="inspector-spine-loop-row" class="inspector-row hidden">
+        <label for="inspector-spine-loop" class="inspector-label">Loop</label>
+        <input id="inspector-spine-loop" type="checkbox" />
+      </div>
       <div id="inspector-frame-select-row" class="inspector-select-row hidden">
-        <label for="inspector-frame-select" class="inspector-label">Jump to frame</label>
+        <label id="inspector-frame-select-label" for="inspector-frame-select" class="inspector-label">Jump to frame</label>
         <select id="inspector-frame-select" class="inspector-select"></select>
       </div>
       <div id="inspector-frames-row" class="inspector-select-row hidden">

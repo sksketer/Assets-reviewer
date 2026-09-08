@@ -1,0 +1,33 @@
+{
+  "skeleton": { "hash": "test", "spine": "3.8.99", "width": 64, "height": 64, "images": "", "audio": "" },
+  "bones": [
+    { "name": "root" }
+  ],
+  "slots": [
+    { "name": "square", "bone": "root", "attachment": "square" }
+  ],
+  "skins": [
+    {
+      "name": "default",
+      "attachments": {
+        "square": {
+          "square": { "x": 0, "y": 0, "width": 64, "height": 64 }
+        }
+      }
+    }
+  ],
+  "animations": {
+    "idle": {},
+    "wave": {
+      "bones": {
+        "root": {
+          "rotate": [
+            { "time": 0, "angle": 0 },
+            { "time": 0.5, "angle": 30 },
+            { "time": 1, "angle": 0 }
+          ]
+        }
+      }
+    }
+  }
+}

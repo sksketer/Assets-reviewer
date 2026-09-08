@@ -6,7 +6,9 @@ import { Inspector } from './ui/inspector';
 import { AnimationConfigDialog } from './ui/animationConfigDialog';
 import { SpriteFrameDialog } from './ui/spriteFrameDialog';
 import { BitmapTextConfigDialog } from './ui/bitmapTextConfigDialog';
-import { validateSpriteFiles, validateAnimationFiles, validateBitmapFontFiles } from './assets/validator';
+import { SpineRuntimeDialog } from './ui/spineRuntimeDialog';
+import { SpineConfigDialog } from './ui/spineConfigDialog';
+import { validateSpriteFiles, validateAnimationFiles, validateBitmapFontFiles, validateSpineFiles } from './assets/validator';
 import {
   createStaticSprite,
   createSpriteFromFrames,
@@ -15,11 +17,14 @@ import {
   createAnimatedSpriteFromSequence,
 } from './assets/spriteFactory';
 import { loadBitmapFont, createBitmapText } from './assets/bitmapTextFactory';
-import type { AssetInfo, AssetMode, PlaceableDisplay } from './assets/types';
+import { loadSpineAsset, createSpineDisplay } from './assets/spineFactory';
+import { loadLegacySpineAsset, createLegacySpineDisplay, getLegacySpineHandle } from './assets/legacySpineFactory';
+import type { AssetInfo, AssetMode, PlaceableDisplay, SpineRuntimeChoice } from './assets/types';
 
 const IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,.png,.jpg,.jpeg,.webp,.gif';
 const ASSET_ACCEPT = `${IMAGE_ACCEPT},application/json,.json`;
 const BITMAP_TEXT_ACCEPT = `${IMAGE_ACCEPT},.fnt,.xml,application/xml,text/xml`;
+const SPINE_ACCEPT = `${IMAGE_ACCEPT},.atlas,.atlas.txt,.json,application/json,.skel,.bin,application/octet-stream`;
 
 async function main() {
   const container = document.getElementById('canvas-container')!;
@@ -28,6 +33,7 @@ async function main() {
   const btnSprite = document.getElementById('btn-add-sprite')!;
   const btnAnimation = document.getElementById('btn-add-animation')!;
   const btnBitmapText = document.getElementById('btn-add-bitmaptext')!;
+  const btnSpine = document.getElementById('btn-add-spine')!;
   const btnRestore = document.getElementById('btn-restore') as HTMLButtonElement;
   const btnClear = document.getElementById('btn-clear')!;
 
@@ -35,6 +41,8 @@ async function main() {
   const animConfigDialog = new AnimationConfigDialog();
   const spriteFrameDialog = new SpriteFrameDialog();
   const bitmapTextConfigDialog = new BitmapTextConfigDialog();
+  const spineRuntimeDialog = new SpineRuntimeDialog();
+  const spineConfigDialog = new SpineConfigDialog();
   const app = await createPixiApp(container);
 
   let currentMode: AssetMode | null = null;
@@ -57,6 +65,7 @@ async function main() {
 
   const inspector = new Inspector((display, info) => {
     app.stage.removeChild(display);
+    getLegacySpineHandle(display)?.pause();
     removedStack.push({ display, info, x: display.x, y: display.y });
     updateRestoreButton();
     setStatus(`Removed "${info.label}" from the stage. Use "Restore Removed" to undo, or keep loading new assets as usual.`);
@@ -72,12 +81,15 @@ async function main() {
     btnSprite.classList.toggle('active', mode === 'sprite');
     btnAnimation.classList.toggle('active', mode === 'animation');
     btnBitmapText.classList.toggle('active', mode === 'bitmapText');
+    btnSpine.classList.toggle('active', mode === 'spine');
     setStatus(
       mode === 'sprite'
         ? 'Sprite mode: choose an image, or a PNG + its spritesheet JSON to pick one frame — or drag files onto the canvas.'
         : mode === 'animation'
           ? 'Animation mode: choose one or more PNG + JSON spritesheets, or several frame images.'
-          : 'Bitmap Text mode: choose a bitmap font file (.fnt or .xml) plus its texture PNG(s).',
+          : mode === 'bitmapText'
+            ? 'Bitmap Text mode: choose a bitmap font file (.fnt or .xml) plus its texture PNG(s).'
+            : 'Spine mode: choose the atlas (.atlas), skeleton (.json or .skel) and texture PNG(s).',
     );
   }
 
@@ -96,7 +108,7 @@ async function main() {
     placedCount += 1;
   }
 
-  async function processFiles(mode: AssetMode, files: File[]): Promise<void> {
+  async function processFiles(mode: AssetMode, files: File[], spineRuntime: SpineRuntimeChoice = 'modern'): Promise<void> {
     if (files.length === 0) return;
 
     if (mode === 'sprite') {
@@ -162,6 +174,47 @@ async function main() {
       return;
     }
 
+    if (mode === 'spine') {
+      const result = await validateSpineFiles(files);
+      if (!result.valid) {
+        modal.showError(result.error);
+        setStatus('Failed to add Spine: invalid assets.');
+        return;
+      }
+
+      try {
+        if (spineRuntime === 'legacy') {
+          const loaded = await loadLegacySpineAsset(result.atlasFile, result.skeletonFile, result.isBinary, result.images);
+          const config = await spineConfigDialog.open(loaded.label, loaded.animationNames);
+          if (!config) {
+            setStatus('Spine creation cancelled.');
+            return;
+          }
+          const { display, info } = createLegacySpineDisplay(loaded, config);
+          placeOnStage(display, info);
+          setStatus(
+            `Added Spine "${loaded.label}" — ${config.animationName ? `playing "${config.animationName}"` : 'setup pose'} at ${config.scale.toFixed(2)}x scale (legacy runtime).`,
+          );
+        } else {
+          const loaded = await loadSpineAsset(result.atlasFile, result.skeletonFile, result.isBinary, result.images);
+          const config = await spineConfigDialog.open(loaded.label, loaded.animationNames);
+          if (!config) {
+            setStatus('Spine creation cancelled.');
+            return;
+          }
+          const { display, info } = createSpineDisplay(loaded, config);
+          placeOnStage(display, info);
+          setStatus(
+            `Added Spine "${loaded.label}" — ${config.animationName ? `playing "${config.animationName}"` : 'setup pose'} at ${config.scale.toFixed(2)}x scale.`,
+          );
+        }
+      } catch (err) {
+        modal.showError(err instanceof Error ? err.message : String(err), 'Failed to Build Spine');
+        setStatus('Failed to add Spine.');
+      }
+      return;
+    }
+
     const result = await validateAnimationFiles(files);
     if (!result.valid) {
       modal.showError(result.error);
@@ -218,18 +271,30 @@ async function main() {
     await processFiles('bitmapText', files);
   });
 
+  btnSpine.addEventListener('click', async () => {
+    const runtime = await spineRuntimeDialog.open();
+    if (!runtime) return;
+
+    setMode('spine');
+    const files = await pickFiles(SPINE_ACCEPT, true);
+    await processFiles('spine', files, runtime);
+  });
+
   btnRestore.addEventListener('click', () => {
     const entry = removedStack.pop();
     if (!entry) return;
     entry.display.x = entry.x;
     entry.display.y = entry.y;
     app.stage.addChild(entry.display);
+    getLegacySpineHandle(entry.display)?.resume();
     updateRestoreButton();
     setStatus(`Restored "${entry.info.label}".`);
   });
 
   btnClear.addEventListener('click', () => {
-    app.stage.removeChildren();
+    const removedChildren = app.stage.removeChildren();
+    for (const child of removedChildren) getLegacySpineHandle(child)?.dispose();
+    for (const entry of removedStack) getLegacySpineHandle(entry.display)?.dispose();
     placedCount = 0;
     removedStack.length = 0;
     updateRestoreButton();
@@ -264,14 +329,16 @@ async function main() {
     if (files.length === 0) return;
 
     if (!currentMode) {
-      modal.showError('Select "+ Sprite", "+ Animation" or "+ Bitmap Text" from the toolbar first, then drag your files onto the canvas.');
+      modal.showError(
+        'Select "+ Sprite", "+ Animation", "+ Bitmap Text" or "+ Spine" from the toolbar first, then drag your files onto the canvas.',
+      );
       return;
     }
     await processFiles(currentMode, files);
   });
 
   updateRestoreButton();
-  setStatus('Select "+ Sprite", "+ Animation" or "+ Bitmap Text" to load assets.');
+  setStatus('Select "+ Sprite", "+ Animation", "+ Bitmap Text" or "+ Spine" to load assets.');
 }
 
 main();
