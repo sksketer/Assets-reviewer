@@ -18,7 +18,8 @@ import {
 } from './assets/spriteFactory';
 import { loadBitmapFont, createBitmapText } from './assets/bitmapTextFactory';
 import { loadSpineAsset, createSpineDisplay } from './assets/spineFactory';
-import type { AssetInfo, AssetMode, PlaceableDisplay } from './assets/types';
+import { loadLegacySpineAsset, createLegacySpineDisplay, getLegacySpineHandle } from './assets/legacySpineFactory';
+import type { AssetInfo, AssetMode, PlaceableDisplay, SpineRuntimeChoice } from './assets/types';
 
 const IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,.png,.jpg,.jpeg,.webp,.gif';
 const ASSET_ACCEPT = `${IMAGE_ACCEPT},application/json,.json`;
@@ -64,6 +65,7 @@ async function main() {
 
   const inspector = new Inspector((display, info) => {
     app.stage.removeChild(display);
+    getLegacySpineHandle(display)?.pause();
     removedStack.push({ display, info, x: display.x, y: display.y });
     updateRestoreButton();
     setStatus(`Removed "${info.label}" from the stage. Use "Restore Removed" to undo, or keep loading new assets as usual.`);
@@ -106,7 +108,7 @@ async function main() {
     placedCount += 1;
   }
 
-  async function processFiles(mode: AssetMode, files: File[]): Promise<void> {
+  async function processFiles(mode: AssetMode, files: File[], spineRuntime: SpineRuntimeChoice = 'modern'): Promise<void> {
     if (files.length === 0) return;
 
     if (mode === 'sprite') {
@@ -181,17 +183,31 @@ async function main() {
       }
 
       try {
-        const loaded = await loadSpineAsset(result.atlasFile, result.skeletonFile, result.isBinary, result.images);
-        const config = await spineConfigDialog.open(loaded.label, loaded.animationNames);
-        if (!config) {
-          setStatus('Spine creation cancelled.');
-          return;
+        if (spineRuntime === 'legacy') {
+          const loaded = await loadLegacySpineAsset(result.atlasFile, result.skeletonFile, result.isBinary, result.images);
+          const config = await spineConfigDialog.open(loaded.label, loaded.animationNames);
+          if (!config) {
+            setStatus('Spine creation cancelled.');
+            return;
+          }
+          const { display, info } = createLegacySpineDisplay(loaded, config);
+          placeOnStage(display, info);
+          setStatus(
+            `Added Spine "${loaded.label}" — ${config.animationName ? `playing "${config.animationName}"` : 'setup pose'} at ${config.scale.toFixed(2)}x scale (legacy runtime).`,
+          );
+        } else {
+          const loaded = await loadSpineAsset(result.atlasFile, result.skeletonFile, result.isBinary, result.images);
+          const config = await spineConfigDialog.open(loaded.label, loaded.animationNames);
+          if (!config) {
+            setStatus('Spine creation cancelled.');
+            return;
+          }
+          const { display, info } = createSpineDisplay(loaded, config);
+          placeOnStage(display, info);
+          setStatus(
+            `Added Spine "${loaded.label}" — ${config.animationName ? `playing "${config.animationName}"` : 'setup pose'} at ${config.scale.toFixed(2)}x scale.`,
+          );
         }
-        const { display, info } = createSpineDisplay(loaded, config);
-        placeOnStage(display, info);
-        setStatus(
-          `Added Spine "${loaded.label}" — ${config.animationName ? `playing "${config.animationName}"` : 'setup pose'} at ${config.scale.toFixed(2)}x scale.`,
-        );
       } catch (err) {
         modal.showError(err instanceof Error ? err.message : String(err), 'Failed to Build Spine');
         setStatus('Failed to add Spine.');
@@ -259,21 +275,9 @@ async function main() {
     const runtime = await spineRuntimeDialog.open();
     if (!runtime) return;
 
-    if (runtime === 'legacy') {
-      modal.showError(
-        'This tool runs on Pixi.js v8. The only Spine runtime that loads skeletons exported from Spine versions ' +
-          'older than 4.0 ("pixi-spine") requires Pixi.js v7 — a completely different rendering engine that cannot ' +
-          "share this app's stage. Please re-export your Spine project with Spine 4.0 or later, then choose " +
-          '"Spine ≥ 4.0" instead.',
-        'Legacy Spine Not Supported',
-      );
-      setStatus('Legacy Spine (< 4.0) is not supported in this Pixi v8 project — export with Spine 4.0+ instead.');
-      return;
-    }
-
     setMode('spine');
     const files = await pickFiles(SPINE_ACCEPT, true);
-    await processFiles('spine', files);
+    await processFiles('spine', files, runtime);
   });
 
   btnRestore.addEventListener('click', () => {
@@ -282,12 +286,15 @@ async function main() {
     entry.display.x = entry.x;
     entry.display.y = entry.y;
     app.stage.addChild(entry.display);
+    getLegacySpineHandle(entry.display)?.resume();
     updateRestoreButton();
     setStatus(`Restored "${entry.info.label}".`);
   });
 
   btnClear.addEventListener('click', () => {
-    app.stage.removeChildren();
+    const removedChildren = app.stage.removeChildren();
+    for (const child of removedChildren) getLegacySpineHandle(child)?.dispose();
+    for (const entry of removedStack) getLegacySpineHandle(entry.display)?.dispose();
     placedCount = 0;
     removedStack.length = 0;
     updateRestoreButton();

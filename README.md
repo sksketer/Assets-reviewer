@@ -11,7 +11,7 @@ A browser-based Pixi.js tool for loading your own sprite, spritesheet, bitmap fo
   - Before creation, a config popup lets you choose which frames play in the loop, the default/starting frame, and the playback speed.
 - **Bitmap text** — load a bitmap font (`.fnt`/`.xml` + its texture PNG page(s)) and configure the text content, font size, fill color, alignment, letter spacing, word wrap, anchor, and rounded-pixel rendering before it's created.
 - **Spine** — load a Spine atlas (`.atlas`) + skeleton (JSON or binary `.skel`/`.bin`) + texture PNG(s), and configure which animation to play, looping, and scale before creation.
-  - Clicking **+ Spine** first asks which runtime to use: **Spine ≥ 4.0** (the official [`@esotericsoftware/spine-pixi-v8`](https://github.com/EsotericSoftware/spine-runtimes) runtime, fully supported) or **Spine < 4.0**. The legacy runtime (`pixi-spine`) requires Pixi.js v7 — a different, incompatible rendering engine that cannot share this app's Pixi v8 stage, so picking it shows an explanation instead of silently failing.
+  - Clicking **+ Spine** first asks which runtime to use: **Spine ≥ 4.0** (the official [`@esotericsoftware/spine-pixi-v8`](https://github.com/EsotericSoftware/spine-runtimes) runtime, added directly to the Pixi v8 stage) or **Spine < 4.0** (`pixi-spine`, which only runs on Pixi v7 — a different, incompatible rendering engine). The legacy skeleton is rendered on its own offscreen Pixi v7 canvas sized to its bounds, then that canvas is re-uploaded as a live texture on a normal Pixi v8 sprite every frame, so it still behaves like any other placed item (draggable, scalable, inspectable, remove/restore-able).
   - Every texture page the atlas declares is matched by filename against the uploaded PNGs; if any is missing, a clear validation error names exactly which file is required.
 - **Inspector panel** — click any placed item to open a draggable panel showing its source, type, file size, pixel dimensions, and estimated GPU memory. For animated sprites it also adds play/pause, a speed slider, and a checklist to change which frames are included in the loop, plus a dropdown to jump to any single frame.
 - **Drag to reposition, ctrl+wheel / pinch to scale** — every placed sprite, animation, or bitmap text can be dragged around the canvas and scaled with ctrl+scroll or a trackpad pinch, without disturbing the click-to-inspect behavior.
@@ -66,7 +66,8 @@ src/
     validator.ts                        Validates selected files and reports clear errors
     spriteFactory.ts                    Builds Sprite/AnimatedSprite instances and their spritesheet loading
     bitmapTextFactory.ts                Parses/loads bitmap fonts and builds BitmapText instances
-    spineFactory.ts                     Parses Spine atlas/skeleton (JSON or binary) and builds Spine instances
+    spineFactory.ts                     Parses Spine atlas/skeleton (JSON or binary) and builds Spine instances (Spine >= 4.0, Pixi v8)
+    legacySpineFactory.ts               Parses Spine < 4.0 atlas/skeleton via pixi-spine (Pixi v7), bridged into a live Pixi v8 sprite
     loadImage.ts, naturalSort.ts, format.ts   Small shared helpers
     types.ts                            Shared types (AssetInfo, PlaceableDisplay, validation results, etc.)
   ui/
@@ -84,6 +85,7 @@ src/
 ## Tech Stack
 
 - [Pixi.js](https://pixijs.com/) v8 for rendering
-- [`@esotericsoftware/spine-pixi-v8`](https://www.npmjs.com/package/@esotericsoftware/spine-pixi-v8) + `@esotericsoftware/spine-core` for Spine support
+- [`@esotericsoftware/spine-pixi-v8`](https://www.npmjs.com/package/@esotericsoftware/spine-pixi-v8) + `@esotericsoftware/spine-core` for Spine >= 4.0 support
+- [`pixi-spine`](https://www.npmjs.com/package/pixi-spine) + its `@pixi/*` Pixi v7 packages for Spine < 4.0 support (rendered on a second, offscreen Pixi v7 renderer)
 - TypeScript
 - [Vite](https://vitejs.dev/) for the dev server and build

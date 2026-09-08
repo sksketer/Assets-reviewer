@@ -1,0 +1,22 @@
+{
+  "skeleton": { "hash": "test", "spine": "3.8.75", "width": 64, "height": 64, "images": "", "audio": "" },
+  "bones": [
+    { "name": "root" }
+  ],
+  "slots": [
+    { "name": "square", "bone": "root", "attachment": "square" }
+  ],
+  "skins": [
+    {
+      "name": "default",
+      "attachments": {
+        "square": {
+          "square": { "x": 0, "y": 0, "width": 64, "height": 64 }
+        }
+      }
+    }
+  ],
+  "animations": {
+    "idle": {}
+  }
+}
