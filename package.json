@@ -1,17 +1,16 @@
 {
   "name": "spritesheet-assets-viewer",
   "private": true,
-  "version": "0.2.1",
+  "version": "0.1.0",
   "type": "module",
-  "author": {
-    "name": "Amrit (sk) Agarwal"
-  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@esotericsoftware/spine-core": "^4.3.13",
+    "@esotericsoftware/spine-pixi-v8": "^4.3.13",
     "pixi.js": "^8.6.0"
   },
   "devDependencies": {

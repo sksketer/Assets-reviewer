@@ -1,9 +1,10 @@
 import type { AnimatedSprite, BitmapFontData, BitmapText, Sprite, Texture } from 'pixi.js';
+import type { Spine } from '@esotericsoftware/spine-pixi-v8';
 
-export type AssetMode = 'sprite' | 'animation' | 'bitmapText';
+export type AssetMode = 'sprite' | 'animation' | 'bitmapText' | 'spine';
 
 /** Any display object this app can place on stage, drag, scale, and inspect. */
-export type PlaceableDisplay = Sprite | AnimatedSprite | BitmapText;
+export type PlaceableDisplay = Sprite | AnimatedSprite | BitmapText | Spine;
 
 export interface PlainSpriteValidation {
   valid: true;
@@ -52,14 +53,26 @@ export interface BitmapFontValidation {
 
 export type BitmapFontFilesValidation = BitmapFontValidation | InvalidValidation;
 
+export type SpineRuntimeChoice = 'legacy' | 'modern';
+
+export interface SpineFilesValidation {
+  valid: true;
+  atlasFile: File;
+  skeletonFile: File;
+  isBinary: boolean;
+  images: File[];
+}
+
+export type SpineFileValidation = SpineFilesValidation | InvalidValidation;
+
 export interface FrameOption {
   name: string;
   texture: Texture;
 }
 
-/** Metadata tracked alongside a placed Sprite/AnimatedSprite/BitmapText, shown in the inspector panel. */
+/** Metadata tracked alongside a placed Sprite/AnimatedSprite/BitmapText/Spine, shown in the inspector panel. */
 export interface AssetInfo {
-  kind: 'sprite' | 'animated' | 'text';
+  kind: 'sprite' | 'animated' | 'text' | 'spine';
   label: string;
   fileSizeBytes: number;
   dimensionsLabel: string;

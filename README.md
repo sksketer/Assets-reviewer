@@ -1,17 +1,23 @@
-# Assets Viewer
+# Sprite Assets Viewer
 
-A browser-based Pixi.js tool for loading your own sprite and spritesheet assets from disk and previewing them as static sprites or animations — no build step or asset pipeline required, just drag files in.
+A browser-based Pixi.js tool for loading your own sprite, spritesheet, bitmap font, and Spine assets from disk and previewing them as static sprites, animations, bitmap text, or Spine skeletons — no build step or asset pipeline required, just drag files in.
 
 ## Features
 
-- **Static sprites** — load a single image, or a PNG plus its spritesheet JSON to display one frame from an atlas.
+- **Static sprites** — load a single image, or a PNG plus its spritesheet JSON and pick which frame to display before it's created.
 - **Animations** — build an `AnimatedSprite` from either:
   - a folder of individual frame images (sorted naturally by filename), or
   - one or more spritesheets (PNG + JSON pairs). Multiple spritesheets can be combined into a single animation.
-- **Animation config popup** — before an animation is created, choose which frames play in the loop, the default/starting frame, and the playback speed.
-- **Inspector panel** — click any placed sprite to open a draggable panel showing its source, type, file size, pixel dimensions, estimated GPU memory, and current frame. For animated sprites it also adds play/pause, a speed slider, and a checklist to change which frames are included in the loop, plus a dropdown to jump to any single frame.
+  - Before creation, a config popup lets you choose which frames play in the loop, the default/starting frame, and the playback speed.
+- **Bitmap text** — load a bitmap font (`.fnt`/`.xml` + its texture PNG page(s)) and configure the text content, font size, fill color, alignment, letter spacing, word wrap, anchor, and rounded-pixel rendering before it's created.
+- **Spine** — load a Spine atlas (`.atlas`) + skeleton (JSON or binary `.skel`/`.bin`) + texture PNG(s), and configure which animation to play, looping, and scale before creation.
+  - Clicking **+ Spine** first asks which runtime to use: **Spine ≥ 4.0** (the official [`@esotericsoftware/spine-pixi-v8`](https://github.com/EsotericSoftware/spine-runtimes) runtime, fully supported) or **Spine < 4.0**. The legacy runtime (`pixi-spine`) requires Pixi.js v7 — a different, incompatible rendering engine that cannot share this app's Pixi v8 stage, so picking it shows an explanation instead of silently failing.
+  - Every texture page the atlas declares is matched by filename against the uploaded PNGs; if any is missing, a clear validation error names exactly which file is required.
+- **Inspector panel** — click any placed item to open a draggable panel showing its source, type, file size, pixel dimensions, and estimated GPU memory. For animated sprites it also adds play/pause, a speed slider, and a checklist to change which frames are included in the loop, plus a dropdown to jump to any single frame.
+- **Drag to reposition, ctrl+wheel / pinch to scale** — every placed sprite, animation, or bitmap text can be dragged around the canvas and scaled with ctrl+scroll or a trackpad pinch, without disturbing the click-to-inspect behavior.
+- **Remove & restore** — the inspector has a "Remove from Stage" action. Removed items aren't destroyed — they're kept in an in-memory cache, and the toolbar's "↺ Restore Removed" button (which shows a live count) brings back the most recently removed item at its original position. Loading new assets keeps working normally in the meantime; "Clear Stage" wipes this cache along with everything else.
 - **Drag & drop** — select a mode from the toolbar, then either use the file picker or drag files directly onto the canvas.
-- **Validation** — mismatched or missing assets (e.g. a spritesheet PNG without its JSON) show a popup explaining what's wrong instead of failing silently.
+- **Validation** — mismatched or missing assets (e.g. a spritesheet PNG without its JSON, or a bitmap font missing a referenced texture page) show a popup explaining what's wrong instead of failing silently.
 
 ## Getting Started
 
@@ -31,40 +37,53 @@ npm run build    # type-check and build for production (outputs to dist/)
 npm run preview  # preview the production build locally
 ```
 
+> The production build uses relative asset paths (`base: './'` in `vite.config.ts`), so `dist/` can be served from any path or sub-directory. Note that opening `dist/index.html` directly via a double-click (`file://`) still won't work — browsers block ES module scripts under `file://` regardless of path; serve the folder with `npm run preview` or any static file server instead.
+
 ## Usage
 
-1. Click **+ Sprite** or **+ Animation** in the toolbar.
+1. Click **+ Sprite**, **+ Animation**, **+ Bitmap Text**, or **+ Spine** in the toolbar.
 2. Pick files via the dialog, or drag them onto the canvas.
    - Sprite: a single image, or an image + its spritesheet JSON.
    - Animation: several frame images, or one or more spritesheet PNG+JSON pairs.
-3. For animations built from a spritesheet, a config popup lets you pick the speed, default frame, and which frames loop — confirm to create it, or cancel to discard.
-4. Click any sprite on the canvas to open its inspector panel; drag the panel by its header to reposition it, and use the close button (×) to dismiss it.
-5. **Clear Stage** removes everything and resets the canvas.
+   - Bitmap Text: a `.fnt`/`.xml` bitmap font file plus its texture PNG(s).
+   - Spine: first choose a runtime (**Spine ≥ 4.0** to proceed; **Spine < 4.0** explains why it's unsupported), then select the `.atlas`, skeleton (`.json`/`.skel`/`.bin`), and texture PNG(s).
+3. For spritesheet-based sprites, animations, bitmap text, and Spine, a config popup lets you choose the relevant options before creation — confirm to create it, or cancel to discard.
+4. On the canvas: drag any item to reposition it, use ctrl+scroll or a trackpad pinch to scale it, or click it to open its inspector panel.
+5. In the inspector: drag by the header to reposition the panel, use the close button (×) to dismiss it, or **Remove from Stage** to take the item off the canvas (it stays cached — bring it back with **↺ Restore Removed** in the toolbar).
+6. **Clear Stage** removes everything, including the removed-items cache, and resets the canvas.
 
 ## Project Structure
 
 ```
-index.html                        Page shell: toolbar, canvas container, modals, inspector panel
+index.html                              Page shell: toolbar, canvas container, modals, inspector panel
 src/
-  main.ts                         Wires up the toolbar, file/drag-drop handling, and stage placement
-  style.css                       All styling
+  main.ts                               Wires up the toolbar, file/drag-drop handling, stage placement, and the remove/restore cache
+  style.css                             All styling
   pixi/
-    app.ts                        Creates and sizes the Pixi Application/canvas
+    app.ts                              Creates and sizes the Pixi Application/canvas
+    interactions.ts                     Drag-to-reposition and ctrl+wheel/pinch-to-scale for placed items
   assets/
-    validator.ts                  Validates selected files and reports clear errors
-    spriteFactory.ts               Builds Sprite/AnimatedSprite instances and their spritesheet loading
+    validator.ts                        Validates selected files and reports clear errors
+    spriteFactory.ts                    Builds Sprite/AnimatedSprite instances and their spritesheet loading
+    bitmapTextFactory.ts                Parses/loads bitmap fonts and builds BitmapText instances
+    spineFactory.ts                     Parses Spine atlas/skeleton (JSON or binary) and builds Spine instances
     loadImage.ts, naturalSort.ts, format.ts   Small shared helpers
-    types.ts                      Shared types (AssetInfo, validation results, etc.)
+    types.ts                            Shared types (AssetInfo, PlaceableDisplay, validation results, etc.)
   ui/
-    modal.ts                      Generic error/message popup
-    animationConfigDialog.ts      Pre-creation animation config popup (speed/default frame/frames)
-    inspector.ts                  Draggable per-sprite inspector panel
-    draggable.ts                  Reusable drag-by-handle behavior
-    fileInput.ts                  Promise-based hidden file input helper
+    modal.ts                            Generic error/message popup
+    animationConfigDialog.ts            Pre-creation animation config popup (speed/default frame/frames)
+    spriteFrameDialog.ts                Pre-creation frame-picker popup for spritesheet sprites
+    bitmapTextConfigDialog.ts           Pre-creation bitmap text config popup
+    spineRuntimeDialog.ts               Runtime picker shown before loading Spine assets
+    spineConfigDialog.ts                Pre-creation Spine config popup (animation/loop/scale)
+    inspector.ts                        Draggable per-item inspector panel (incl. Remove from Stage)
+    draggable.ts                        Reusable drag-by-handle behavior
+    fileInput.ts                        Promise-based hidden file input helper
 ```
 
 ## Tech Stack
 
 - [Pixi.js](https://pixijs.com/) v8 for rendering
+- [`@esotericsoftware/spine-pixi-v8`](https://www.npmjs.com/package/@esotericsoftware/spine-pixi-v8) + `@esotericsoftware/spine-core` for Spine support
 - TypeScript
 - [Vite](https://vitejs.dev/) for the dev server and build

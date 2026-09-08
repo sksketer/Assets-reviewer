@@ -1,9 +1,11 @@
 import { bitmapFontTextParser, bitmapFontXMLStringParser } from 'pixi.js';
-import type { AnimationValidation, BitmapFontFilesValidation, SpriteFileValidation, SpritesheetPair } from './types';
+import type { AnimationValidation, BitmapFontFilesValidation, SpineFileValidation, SpriteFileValidation, SpritesheetPair } from './types';
 
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.gif'];
 const JSON_EXTENSIONS = ['.json'];
 const FONT_EXTENSIONS = ['.fnt', '.xml'];
+const ATLAS_EXTENSIONS = ['.atlas', '.atlas.txt'];
+const SKELETON_BINARY_EXTENSIONS = ['.skel', '.bin'];
 
 function hasExtension(name: string, extensions: string[]): boolean {
   const lower = name.toLowerCase();
@@ -22,6 +24,14 @@ export function isJsonFile(file: File): boolean {
 
 export function isFontFile(file: File): boolean {
   return hasExtension(file.name, FONT_EXTENSIONS);
+}
+
+export function isAtlasFile(file: File): boolean {
+  return hasExtension(file.name, ATLAS_EXTENSIONS);
+}
+
+export function isSkeletonBinaryFile(file: File): boolean {
+  return hasExtension(file.name, SKELETON_BINARY_EXTENSIONS);
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -250,4 +260,50 @@ export async function validateBitmapFontFiles(files: File[]): Promise<BitmapFont
   }
 
   return { valid: true, fontData, fontFileName: fontFile.name, images };
+}
+
+export async function validateSpineFiles(files: File[]): Promise<SpineFileValidation> {
+  const atlasFiles = files.filter(isAtlasFile);
+  const binarySkeletonFiles = files.filter(isSkeletonBinaryFile);
+  const jsonSkeletonFiles = files.filter(isJsonFile);
+  const images = files.filter(isImageFile);
+
+  if (atlasFiles.length === 0) {
+    return {
+      valid: false,
+      error: 'Please select a Spine atlas file (.atlas) plus its skeleton file (.json or .skel) and texture PNG(s).',
+    };
+  }
+  if (atlasFiles.length > 1) {
+    return { valid: false, error: 'Only one atlas file (.atlas) is allowed.' };
+  }
+
+  const skeletonFiles = [...jsonSkeletonFiles, ...binarySkeletonFiles];
+  if (skeletonFiles.length === 0) {
+    return {
+      valid: false,
+      error: 'Please also select the Spine skeleton file exported alongside the atlas (.json or .skel/.bin).',
+    };
+  }
+  if (skeletonFiles.length > 1) {
+    return {
+      valid: false,
+      error: `Only one skeleton file is allowed, but ${skeletonFiles.length} were provided (${skeletonFiles.map((f) => f.name).join(', ')}).`,
+    };
+  }
+
+  if (images.length === 0) {
+    return {
+      valid: false,
+      error: "Please also select the atlas's texture PNG(s) — the image file(s) its pages reference.",
+    };
+  }
+
+  return {
+    valid: true,
+    atlasFile: atlasFiles[0],
+    skeletonFile: skeletonFiles[0],
+    isBinary: binarySkeletonFiles.length === 1,
+    images,
+  };
 }

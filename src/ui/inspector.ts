@@ -9,6 +9,7 @@ const TYPE_LABELS: Record<AssetInfo['kind'], string> = {
   sprite: 'Sprite',
   animated: 'Animated Sprite',
   text: 'Bitmap Text',
+  spine: 'Spine',
 };
 
 export class Inspector {
@@ -97,7 +98,7 @@ export class Inspector {
     this.title.textContent = info.label;
     this.sourceEl.textContent = info.label;
     this.typeEl.textContent = TYPE_LABELS[info.kind];
-    this.frameLabelEl.textContent = info.kind === 'text' ? 'Text' : 'Current frame';
+    this.frameLabelEl.textContent = info.kind === 'text' ? 'Text' : info.kind === 'spine' ? 'Animation' : 'Current frame';
     this.fileSizeEl.textContent = formatBytes(info.fileSizeBytes);
     this.dimensionsEl.textContent = info.dimensionsLabel;
     this.gpuEl.textContent = formatBytes(info.gpuMemoryBytes);
